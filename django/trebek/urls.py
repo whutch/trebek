@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""URL configuration for core app."""
+"""Base URL configuration for project."""
 # Part of Trebek (https://github.com/whutch/trebek)
 # :copyright: (c) 2018 Will Hutcheson
 # :license: MIT (https://github.com/whutch/trebek/blob/master/LICENSE.txt)

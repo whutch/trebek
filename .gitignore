@@ -1,0 +1,22 @@
+# Python cache and bytecode
+*.py[cod]
+__pycache__/
+
+# Development
+*~
+.cache/
+.coverage
+.coverage-html/
+.idea/
+.tox
+.vscode/
+
+# Building
+dist/
+build/
+
+# Deployment
+.venv/
+logs/
+www/static/*
+!www/static/.htaccess

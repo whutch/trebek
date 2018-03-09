@@ -6,4 +6,12 @@
 
 from django.contrib import admin
 
-# Register your models here.
+from . import models
+
+
+admin.site.register(models.UserData)
+admin.site.register(models.QuestionCategory)
+admin.site.register(models.Question)
+admin.site.register(models.Game)
+admin.site.register(models.QuestionState)
+admin.site.register(models.Player)

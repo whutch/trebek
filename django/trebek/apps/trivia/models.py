@@ -22,9 +22,10 @@ class UserData(models.Model):
 class QuestionCategory(models.Model):
 
     title = models.CharField(max_length=100)
+    order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
-        ordering = ("title",)
+        ordering = ("order", "title",)
 
     def __str__(self):
         return str(self.title)
@@ -33,16 +34,16 @@ class QuestionCategory(models.Model):
 class Question(models.Model):
 
     category = models.ForeignKey(
-        QuestionCategory, on_delete=models.CASCADE)
+        QuestionCategory, on_delete=models.CASCADE, related_name="questions")
     text = models.CharField(max_length=200)
     answer = models.CharField(max_length=200)
-    point_value = models.PositiveSmallIntegerField()
+    point_value = models.PositiveSmallIntegerField(default=200)
 
     class Meta:
-        ordering = ("category", "-point_value", "text")
+        ordering = ("category", "point_value", "text")
 
     def __str__(self):
-        return str(self.text)
+        return "{} ({}): {}".format(self.category, self.point_value, self.text)
 
 
 class Game(models.Model):
@@ -68,15 +69,23 @@ class QuestionState(models.Model):
     game = models.ForeignKey(Game, on_delete=models.CASCADE)
     answered = models.BooleanField(default=False)
 
+    class Meta:
+        ordering = ("game", "question")
+        unique_together = ("game", "question")
+
+    def __str__(self):
+        return "{}: {}".format(self.game, self.question)
+
 
 class Player(models.Model):
 
     game = models.ForeignKey(Game, on_delete=models.CASCADE)
     name = models.CharField(max_length=20)
-    score = models.PositiveSmallIntegerField()
+    score = models.SmallIntegerField(default=0)
 
     class Meta:
         ordering = ("game", "name")
+        unique_together = ("game", "name")
 
     def __str__(self):
         return str(self.name)

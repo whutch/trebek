@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+
+{% block page_title %}Admin{% endblock %}
+
+
+{% block page_styles %}
+    <style>
+
+    </style>
+{% endblock %}
+
+
+{% block page_content %}
+    <div class="container">
+        <div class="row d-none" id="question-context">
+            <div class="col">
+                <span id="question-points"></span>
+            </div>
+            <div class="col">
+                <span id="question-text"></span>
+            </div>
+            <div class="col">
+                <span id="question-answer"></span>
+            </div>
+            <div class="col">
+                <div class="row" id="answer-controls">
+                    <div class="col">
+                        <button type="button" class="btn btn-primary" id="correct">Correct</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-primary" id="wrong">Wrong</button>
+                    </div>
+                    <div class="col">
+                        Buzzed: <span id="buzzed"></span>
+                        <input type="hidden" id="question-id" val="" />
+                        <input type="hidden" id="buzzer-id" val="" />
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            {% for category, questions in categories %}
+                <div class="col">
+                    <div class="category">
+                        <p>{{ category.title }}</p>
+                    </div>
+                    {% for question in questions %}
+                        <button type="button" class="btn btn-primary question" id="question-{{ question.id }}">
+                            {{ question.point_value }}
+                        </button>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}
+
+
+{% block page_scripts %}
+    <script type="text/javascript">
+
+        var question_data = {
+            {% for category, questions in categories %}
+                {% for question in questions %}
+                    {{ question.id }}: {
+                        text: "{{ question.text }}",
+                        answer: "{{ question.answer }}",
+                        points: {{ question.point_value }},
+                    },
+                {% endfor %}
+            {% endfor %}
+        }
+
+        function player_buzzed(player_id, player_name) {
+            if ($("#buzzed").text() == "") {
+                $("#buzzed").text(player_name)
+                $("#buzzer-id").val(player_id)
+                $("#answer-controls button").attr("disabled", false)
+            }
+        }
+
+        function parse_message(msg) {
+            if (msg.type == "buzz") {
+                player_buzzed(msg.player_id, msg.player_name);
+            }
+        }
+
+        $(".question").on("click", function () {
+            var question_id = $(this).attr("id").split("-")[1];
+            $("#question-points").text(question_data[question_id].points)
+            $("#question-text").text(question_data[question_id].text)
+            $("#question-answer").text(question_data[question_id].answer)
+            $("#buzzed").text("");
+            $("#buzzer-id").val("");
+            $("#question-id").val(question_id);
+            $("#answer-controls button").attr("disabled", true);
+            $("#question-context").removeClass("d-none");
+            ws.send(JSON.stringify({
+                type: "pop_question",
+                game: "{{ game.key }}",
+                id: parseInt(question_id),
+            }));
+        });
+
+        $("#correct").on("click", function () {
+            var question_id = $("#question-id").val();
+            var player_id = $("#buzzer-id").val();
+            ws.send(JSON.stringify({
+                type: "add_points",
+                game: "{{ game.key }}",
+                player: player_id,
+                points: question_data[question_id].points,
+            }));
+            ws.send(JSON.stringify({
+                type: "unpop_question",
+                game: "{{ game.key }}",
+            }));
+            $("#question-context").addClass("d-none");
+        });
+
+        $("#wrong").on("click", function () {
+            var question_id = $("#question-id").val();
+            var player_id = $("#buzzer-id").val();
+            ws.send(JSON.stringify({
+                type: "add_points",
+                game: "{{ game.key }}",
+                player: player_id,
+                points: 0 - question_data[question_id].points,
+            }));
+            $("#buzzed").text("");
+            $("#buzzer-id").val("");
+            $("#answer-controls button").attr("disabled", true)
+        });
+
+        ws = new WebSocket("{{ ws_uri }}");
+        ws.onopen = function (event) {
+            ws.send(JSON.stringify({
+                type: "register_admin",
+                game: "{{ game.key }}",
+            }));
+        };
+        ws.onmessage = function (event) {
+            var data = JSON.parse(event.data);
+            parse_message(data);
+        };
+    </script>
+{% endblock %}

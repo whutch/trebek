@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+
+{% block page_title %}Trebek{% endblock %}
+
+
+{% block page_styles %}
+    <style>
+        .container {
+            margin-left: 20vw;
+        }
+
+        #buttons {
+            margin-top: 15vh;
+        }
+
+        #buzzer {
+            width: 50vw;
+            font-size: 200%;
+        }
+    </style>
+{% endblock %}
+
+
+{% block page_content %}
+    <div class="container">
+        <div class="row" id="buttons">
+            <div class="col-md">
+                <button type="button" id="buzzer" class="btn btn-primary btn-lg" id="buzzer" disabled="true">Buzz</button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+
+{% block page_scripts %}
+    <script type="text/javascript">
+        $("#buzzer").on("click", function () {
+            ws.send(JSON.stringify({
+                type: "buzz",
+                game: "{{ game.key }}",
+                player_id: "{{ player.id }}",
+                player_name: "{{ player.name }}",
+            }));
+        });
+
+        ws = new WebSocket("{{ ws_uri }}");
+    </script>
+{% endblock %}

@@ -4,8 +4,11 @@
 # :copyright: (c) 2018 Will Hutcheson
 # :license: MIT (https://github.com/whutch/trebek/blob/master/LICENSE.txt)
 
+from django.conf.urls import include
 from django.contrib import admin
 from django.urls import path
+
+from .apps.trivia import views as trivia_views
 
 
 """
@@ -26,4 +29,9 @@ Including another URLconf
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("", trivia_views.trivia_home, name="trivia_home"),
+    path("<str:game_key>/", trivia_views.game_home, name="game_home"),
+    path("<str:game_key>/admin/", trivia_views.admin, name="admin"),
+    path("<str:game_key>/buzzer/", trivia_views.buzzer, name="buzzer"),
+    path("<str:game_key>/display/", trivia_views.display, name="display"),
 ]

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+
+{% block page_title %}Trebek{% endblock %}
+
+
+{% block page_styles %}
+    <style>
+
+        form input {
+            margin-top: 1em;
+        }
+
+        .footer {
+            margin-top: 3em;
+        }
+    </style>
+{% endblock %}
+
+
+{% block page_content %}
+    <div class="container">
+        <div class="row">
+            <div class="col-sm">
+                {% if error_message %}
+                    <p><strong>{{ error_message }}</strong></p>
+                {% endif %}
+                <form action="{% url 'trivia_home' %}" method="post">
+                    {% csrf_token %}
+                    <input type="text" class="form-control" name="game_key" placeholder="Game key (ex. JRHP)" />
+                    <input type="text" class="form-control" name="player_name" placeholder="Player name" />
+                    <input type="submit" class="btn btn-primary" value="Join Game" />
+                </form>
+            </div>
+        </div>
+        <div class="footer">
+            <em class="small">
+                &copy; Will Hutcheson 2018. Powered by
+                <a href="https://www.djangoproject.com">Django</a>,
+                <a href="https://jquery.com">jQuery</a>, and
+                <a href="https://getbootstrap.com">Bootstrap</a>.
+            </em>
+        </div>
+    </div>
+{% endblock %}
+
+
+{% block page_scripts %}
+    <script type="text/javascript">
+
+    </script>
+{% endblock %}

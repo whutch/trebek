@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+
+{% block page_title %}Display{% endblock %}
+
+
+{% block page_styles %}
+    <style>
+        body {
+            background: black;
+        }
+
+        .category, .question {
+            position: relative;
+            width: 100%;
+            padding-bottom: 75%;
+
+            background: #3f48cc;
+            text-transform: uppercase;
+            text-align: center;
+            text-shadow: 0.08em 0.08em black;
+        }
+
+        .category > p, .question > p {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            margin-top: 20%;
+        }
+
+        .category {
+            margin-top: 10px;
+            margin-bottom: 30px;
+
+            color: white;
+            font-size: 125%;
+        }
+
+        .question {
+            margin-bottom: 10px;
+
+            color: #ffc90e;
+            font-size: 250%;
+        }
+
+        .question-popup {
+            position: absolute;
+            z-index: 999;
+            padding: 1em 0.6em;
+
+            background: #3f48cc;
+            color: white;
+            font-size: 60%;
+            text-transform: uppercase;
+            text-align: center;
+            text-shadow: 0.08em 0.08em black;
+
+            transition: 1.5s;
+            -webkit-transition: 1.5s;
+        }
+
+        .question-popup > p {
+            width: 100%;
+            padding: 1em;
+        }
+
+        .question-popup-fs {
+            width: 100vw !important;
+            height: 100vh !important;
+            top: 0 !important;
+            left: 0 !important;
+            font-size: 500%;
+        }
+    </style>
+{% endblock %}
+
+
+{% block page_content %}
+    <div class="container">
+        <div class="row">
+            {% for category, questions in categories %}
+                <div class="col">
+                    <div class="category">
+                        <p>{{ category.title }}</p>
+                    </div>
+                    {% for question in questions %}
+                        <div class="question" id="question-{{ question.id }}">
+                            <p>{{ question.point_value }}</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}
+
+
+{% block page_scripts %}
+    <script type="text/javascript">
+
+        function parse_message(msg) {
+            if (msg.type == "pop_question") {
+                pop_question(msg.id, msg.text);
+            }
+            else if (msg.type == "unpop_question") {
+                unpop_question();
+            }
+        }
+
+        function pop_question(id, text) {
+            unpop_question();
+            var question = $("#question-" + id);
+            var popup = $("<div class='question-popup'></div>").appendTo($("body"));
+            popup.width(question.width());
+            popup.height(question.outerHeight());
+            popup.css(question.offset());
+            var popup_text = $("<p></p>").appendTo(popup);
+            popup_text.text(text);
+            setTimeout(function() {
+                question.children("p").text("");
+                popup.addClass("question-popup-fs");
+            }, 200);
+        }
+
+        function unpop_question() {
+            var popup = $(".question-popup-fs");
+            if (popup[0]) {
+                popup.removeClass("question-popup-fs");
+                setTimeout(function() {
+                    popup.remove();
+                }, 1400);
+            }
+        }
+
+        ws = new WebSocket("{{ ws_uri }}");
+        ws.onopen = function (event) {
+            ws.send(JSON.stringify({
+                type: "register_display",
+                game: "{{ game.key }}",
+            }));
+        };
+        ws.onmessage = function (event) {
+            var data = JSON.parse(event.data);
+            parse_message(data);
+        };
+    </script>
+{% endblock %}

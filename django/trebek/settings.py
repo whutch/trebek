@@ -56,7 +56,9 @@ ROOT_URLCONF = "trebek.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [
+            os.path.join(BASE_DIR, "trebek", "templates"),
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -120,6 +122,22 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.0/howto/static-files/
 
 STATIC_URL = "/static/"
+
+STATIC_ROOT = os.path.join(BASE_DIR, "..", "www", "static")
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "trebek", "static"),
+]
+
+STATICFILES_FINDERS = (
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+)
+
+
+# Miscellaneous options
+
+APPEND_SLASH = True
 
 
 # Bring in sensitive or non-portable settings from a non-versioned file

@@ -110,6 +110,11 @@
                 $("#buzzed").text(player_name);
                 $("#buzzer-id").val(player_id);
                 $("#answer-controls button").attr("disabled", false);
+                ws.send(JSON.stringify({
+                    type: "play_sound",
+                    game: "{{ game.key }}",
+                    sound: "buzz",
+                }));
                 cant_buzz();
             }
         }

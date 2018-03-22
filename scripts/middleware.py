@@ -101,6 +101,14 @@ def middleware():
                             "type": "cant_buzz",
                         }
                         await player.send(json.dumps(msg))
+                elif msg_type == "play_sound":
+                    game_key = msg_data["game"]
+                    msg = {
+                        "type": "play_sound",
+                        "sound": msg_data["sound"],
+                    }
+                    display = displays[game_key]
+                    await display.send(json.dumps(msg))
                 else:
                     print("Unknown message:", msg_data)
         except websockets.ConnectionClosed:

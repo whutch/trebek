@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 
 {% block page_title %}Display{% endblock %}
@@ -99,6 +100,10 @@
 {% block page_scripts %}
     <script type="text/javascript">
 
+        var sounds = {
+            buzz: new Audio("{% static 'trebek/sounds/buzz.ogg' %}"),
+        };
+
         function parse_message(msg) {
             if (msg.type == "pop_question") {
                 pop_question(msg.id, msg.text);
@@ -106,6 +111,15 @@
             else if (msg.type == "unpop_question") {
                 unpop_question(msg.answered);
             }
+            else if (msg.type == "play_sound") {
+                play_sound(msg.sound);
+            }
+        }
+
+        function play_sound(sound) {
+            var snd = sounds[sound];
+            snd.currentTime = 0;
+            snd.play();
         }
 
         function pop_question(id, text) {

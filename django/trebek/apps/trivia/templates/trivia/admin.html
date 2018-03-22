@@ -6,30 +6,49 @@
 
 {% block page_styles %}
     <style>
+        div.row {
+            margin-top: 0.5em;
+        }
 
+        button.question {
+            margin-bottom: 0.5em;
+            width: 100%;
+        }
+
+        #buzzed {
+            color: blue;
+            font-weight: bold;
+        }
     </style>
 {% endblock %}
 
 
 {% block page_content %}
     <div class="container">
+        <div class="row">
+            <div class="col">
+                <button type="button" class="btn btn-warning" id="back">Back</button>
+            </div>
+        </div>
         <div class="row d-none" id="question-context">
-            <div class="col">
-                <span id="question-points"></span>
-            </div>
-            <div class="col">
-                <span id="question-text"></span>
-            </div>
-            <div class="col">
-                <span id="question-answer"></span>
-            </div>
-            <div class="col">
-                <div class="row" id="answer-controls">
+            <div class"col">
+                <div class="row" id="question-details">
                     <div class="col">
-                        <button type="button" class="btn btn-primary" id="correct">Correct</button>
+                        <span id="question-points"></span>
                     </div>
                     <div class="col">
-                        <button type="button" class="btn btn-primary" id="wrong">Wrong</button>
+                        <span id="question-text"></span>
+                    </div>
+                    <div class="col">
+                        <span id="question-answer"></span>
+                    </div>
+                </div>
+                <div class="row" id="answer-controls">
+                    <div class="col">
+                        <button type="button" class="btn btn-success" id="correct">Correct</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-danger" id="wrong">Wrong</button>
                     </div>
                     <div class="col">
                         Buzzed: <span id="buzzed"></span>
@@ -131,6 +150,14 @@
             $("#buzzed").text("");
             $("#buzzer-id").val("");
             $("#answer-controls button").attr("disabled", true)
+        });
+
+        $("#back").on("click", function () {
+            ws.send(JSON.stringify({
+                type: "unpop_question",
+                game: "{{ game.key }}",
+            }));
+            $("#question-context").addClass("d-none");
         });
 
         ws = new WebSocket("{{ ws_uri }}");

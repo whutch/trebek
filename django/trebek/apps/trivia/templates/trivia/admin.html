@@ -93,9 +93,9 @@
 
         function player_buzzed(player_id, player_name) {
             if ($("#buzzed").text() == "") {
-                $("#buzzed").text(player_name)
-                $("#buzzer-id").val(player_id)
-                $("#answer-controls button").attr("disabled", false)
+                $("#buzzed").text(player_name);
+                $("#buzzer-id").val(player_id);
+                $("#answer-controls button").attr("disabled", false);
             }
         }
 
@@ -107,9 +107,9 @@
 
         $(".question").on("click", function () {
             var question_id = $(this).attr("id").split("-")[1];
-            $("#question-points").text(question_data[question_id].points)
-            $("#question-text").text(question_data[question_id].text)
-            $("#question-answer").text(question_data[question_id].answer)
+            $("#question-points").text(question_data[question_id].points);
+            $("#question-text").text(question_data[question_id].text);
+            $("#question-answer").text(question_data[question_id].answer);
             $("#buzzed").text("");
             $("#buzzer-id").val("");
             $("#question-id").val(question_id);
@@ -134,6 +134,7 @@
             ws.send(JSON.stringify({
                 type: "unpop_question",
                 game: "{{ game.key }}",
+                answered: false,
             }));
             $("#question-context").addClass("d-none");
         });
@@ -149,13 +150,14 @@
             }));
             $("#buzzed").text("");
             $("#buzzer-id").val("");
-            $("#answer-controls button").attr("disabled", true)
+            $("#answer-controls button").attr("disabled", true);
         });
 
         $("#back").on("click", function () {
             ws.send(JSON.stringify({
                 type: "unpop_question",
                 game: "{{ game.key }}",
+                answered: true,
             }));
             $("#question-context").addClass("d-none");
         });

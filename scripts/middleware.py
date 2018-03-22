@@ -50,6 +50,7 @@ def middleware():
                     game_key = msg_data["game"]
                     msg = {
                         "type": "unpop_question",
+                        "answered": msg_data["answered"],
                     }
                     display = displays[game_key]
                     await display.send(json.dumps(msg))

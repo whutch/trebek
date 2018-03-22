@@ -26,7 +26,7 @@
     <div class="container">
         <div class="row" id="buttons">
             <div class="col-md">
-                <button type="button" id="buzzer" class="btn btn-primary btn-lg" id="buzzer" disabled="true">Buzz</button>
+                <button type="button" id="buzzer" class="btn btn-secondary btn-lg" id="buzzer" disabled="true">Buzz</button>
             </div>
         </div>
     </div>
@@ -35,6 +35,22 @@
 
 {% block page_scripts %}
     <script type="text/javascript">
+
+        function parse_message(msg) {
+            if (msg.type == "can_buzz") {
+                $("#buzzer")
+                    .addClass("btn-primary")
+                    .removeClass("btn-secondary")
+                    .attr("disabled", false);
+            }
+            else if (msg.type == "cant_buzz") {
+                $("#buzzer")
+                    .addClass("btn-secondary")
+                    .removeClass("btn-primary")
+                    .attr("disabled", true);
+            }
+        }
+
         $("#buzzer").on("click", function () {
             ws.send(JSON.stringify({
                 type: "buzz",
@@ -45,5 +61,17 @@
         });
 
         ws = new WebSocket("{{ ws_uri }}");
+        ws.onopen = function (event) {
+            ws.send(JSON.stringify({
+                type: "register_player",
+                game: "{{ game.key }}",
+                id: "{{ player.id }}",
+                name: "{{ player.name }}",
+            }));
+        };
+        ws.onmessage = function (event) {
+            var data = JSON.parse(event.data);
+            parse_message(data);
+        };
     </script>
 {% endblock %}

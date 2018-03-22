@@ -91,11 +91,26 @@
             {% endfor %}
         }
 
+        function can_buzz() {
+            ws.send(JSON.stringify({
+                type: "can_buzz",
+                game: "{{ game.key }}",
+            }));
+        }
+
+        function cant_buzz() {
+            ws.send(JSON.stringify({
+                type: "cant_buzz",
+                game: "{{ game.key }}",
+            }));
+        }
+
         function player_buzzed(player_id, player_name) {
             if ($("#buzzed").text() == "") {
                 $("#buzzed").text(player_name);
                 $("#buzzer-id").val(player_id);
                 $("#answer-controls button").attr("disabled", false);
+                cant_buzz();
             }
         }
 
@@ -120,10 +135,12 @@
                 game: "{{ game.key }}",
                 id: parseInt(question_id),
             }));
+            can_buzz();
         });
 
         $("#correct").on("click", function () {
             var question_id = $("#question-id").val();
+            var question = $("#question-" + question_id);
             var player_id = $("#buzzer-id").val();
             ws.send(JSON.stringify({
                 type: "add_points",
@@ -134,9 +151,13 @@
             ws.send(JSON.stringify({
                 type: "unpop_question",
                 game: "{{ game.key }}",
-                answered: false,
+                answered: true,
             }));
             $("#question-context").addClass("d-none");
+            question
+                .addClass("btn-secondary")
+                .removeClass("btn-primary")
+                .attr("disabled", true);
         });
 
         $("#wrong").on("click", function () {
@@ -151,13 +172,15 @@
             $("#buzzed").text("");
             $("#buzzer-id").val("");
             $("#answer-controls button").attr("disabled", true);
+            can_buzz();
         });
 
         $("#back").on("click", function () {
+            cant_buzz();
             ws.send(JSON.stringify({
                 type: "unpop_question",
                 game: "{{ game.key }}",
-                answered: true,
+                answered: false,
             }));
             $("#question-context").addClass("d-none");
         });

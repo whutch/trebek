@@ -26,6 +26,7 @@ HOST_PORT = 8765
 def middleware():
     displays = {}
     admins = {}
+    players = {}
     async def listen(websocket, path):
         try:
             async for message in websocket:
@@ -74,6 +75,10 @@ def middleware():
                     game_key = msg_data["game"]
                     player_id = msg_data["id"]
                     player_name = msg_data["name"]
+                    if game_key not in players:
+                        players[game_key] = {}
+                    players[game_key][player_id] = websocket
+                    print("Registering player '{}' ({}) for game {}.".format(player_name, player_id, game_key))
                 elif msg_type == "add_points":
                     game_key = msg_data["game"]
                     player_id = msg_data["player"]
@@ -82,6 +87,20 @@ def middleware():
                     player.score += int(points)
                     print("Adjusting score of player '{}' by {} (now {}).".format(player.name, points, player.score))
                     player.save()
+                elif msg_type == "can_buzz":
+                    game_key = msg_data["game"]
+                    for player in players[game_key].values():
+                        msg = {
+                            "type": "can_buzz",
+                        }
+                        await player.send(json.dumps(msg))
+                elif msg_type == "cant_buzz":
+                    game_key = msg_data["game"]
+                    for player in players[game_key].values():
+                        msg = {
+                            "type": "cant_buzz",
+                        }
+                        await player.send(json.dumps(msg))
                 else:
                     print("Unknown message:", msg_data)
         except websockets.ConnectionClosed:

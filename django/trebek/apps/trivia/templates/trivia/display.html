@@ -86,7 +86,7 @@
                     </div>
                     {% for question in questions %}
                         <div class="question" id="question-{{ question.id }}">
-                            <p>{{ question.point_value }}</p>
+                            <p>{% if not question.answered %}{{ question.point_value }}{% endif %}</p>
                         </div>
                     {% endfor %}
                 </div>
@@ -100,21 +100,28 @@
 {% block page_scripts %}
     <script type="text/javascript">
 
+        var msg_types = {
+            ERROR: 0,
+            ADMIN_CONNECTED: 1,
+            DISPLAY_CONNECTED: 2,
+            PLAYER_CONNECTED: 3,
+            GAME_START: 4,
+            GAME_RESET: 5,
+            POP_QUESTION: 6,
+            CLEAR_QUESTION: 7,
+            PLAYER_BUZZED: 8,
+            CLEAR_BUZZ: 9,
+            UPDATE_SCORE: 10,
+            PLAY_SOUND: 11,
+        };
+
         var sounds = {
             buzz: new Audio("{% static 'trebek/sounds/buzz.ogg' %}"),
         };
 
-        function parse_message(msg) {
-            if (msg.type == "pop_question") {
-                pop_question(msg.id, msg.text);
-            }
-            else if (msg.type == "unpop_question") {
-                unpop_question(msg.answered);
-            }
-            else if (msg.type == "play_sound") {
-                play_sound(msg.sound);
-            }
-        }
+        var ws = null;
+        var game_started = false;
+        var question_id = null;
 
         function play_sound(sound) {
             var snd = sounds[sound];
@@ -123,13 +130,16 @@
         }
 
         function pop_question(id, text) {
-            unpop_question();
-            $("#question-id").val(id);
-            var question = $("#question-" + id);
+            if (id == question_id) {
+                return;
+            }
+            clear_question();
+            question_id = id;
+            var question_box = $("#question-" + question_id);
             var popup = $("<div class='question-popup'></div>").appendTo($("body"));
-            popup.width(question.width());
-            popup.height(question.outerHeight());
-            popup.css(question.offset());
+            popup.width(question_box.width());
+            popup.height(question_box.outerHeight());
+            popup.css(question_box.offset());
             var popup_text = $("<p></p>").appendTo(popup);
             popup_text.text(text);
             setTimeout(function() {
@@ -137,10 +147,9 @@
             }, 200);
         }
 
-        function unpop_question(answered) {
+        function clear_question(answered = false) {
             if (answered) {
-                var question = $("#question-" + $("#question-id").val());
-                question.children("p").text("");
+                disable_question(question_id);
             }
             var popup = $(".question-popup-fs");
             if (popup[0]) {
@@ -149,18 +158,100 @@
                     popup.remove();
                 }, 1400);
             }
+            question = null;
+            question_id = null;
         }
 
-        ws = new WebSocket("{{ ws_uri }}");
-        ws.onopen = function (event) {
-            ws.send(JSON.stringify({
-                type: "register_display",
-                game: "{{ game.key }}",
-            }));
-        };
-        ws.onmessage = function (event) {
-            var data = JSON.parse(event.data);
-            parse_message(data);
-        };
+        function disable_question(id) {
+            $("#question-" + id).children("p").text("");
+        }
+
+        function set_score(player_id, amount)
+        {
+
+        }
+
+        function show_alert(html, alert_class="danger") {
+            if (true) return;
+            $("#status .alert")
+                .html(html)
+                .removeClass("alert-primary alert-secondary alert-success alert-danger alert-warning alert-info")
+                .addClass("alert-" + alert_class);
+            $("#status").show();
+        }
+
+        function clear_alert() {
+            if (true) return;
+            $("#status").hide();
+        }
+
+        function parse_message(msg) {
+            switch (msg.type) {
+                case msg_types.ERROR:
+                    console.error("Received error from middleware:", msg.error);
+                    return;
+                case msg_types.GAME_START:
+                    break;
+                case msg_types.GAME_RESET:
+                    break;
+                case msg_types.POP_QUESTION:
+                    pop_question(msg.question_id, msg.question_text);
+                    break;
+                case msg_types.CLEAR_QUESTION:
+                    clear_question(msg.answered);
+                    break;
+                case msg_types.PLAYER_BUZZED:
+                    break;
+                case msg_types.UPDATE_SCORE:
+                    set_score(msg.player_id, msg.value);
+                    break;
+                case msg_types.PLAY_SOUND:
+                    play_sound(msg.sound);
+                    break;
+                default:
+                    console.error("Unhandled msg.type:", msg.type);
+                    return;
+            }
+        }
+
+        function send_message(type, data={}) {
+            Object.assign(data, {
+                type: type,
+                game_key: "{{ game.key }}",
+            });
+            if (!ws || ws.readyState != WebSocket.OPEN) {
+                console.error("Could not send msg, websocket closed:", data);
+                return;
+            }
+            ws.send(JSON.stringify(data));
+        }
+
+        function connect(uri) {
+            ws = new WebSocket(uri);
+            ws.onopen = function (event) {
+                send_message(msg_types.DISPLAY_CONNECTED);
+                clear_alert();
+            };
+            ws.onmessage = function (event) {
+                var data = JSON.parse(event.data);
+                parse_message(data);
+            };
+            ws.onclose = function () {
+                show_alert("Reconnecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>");
+                // The reconnection attempt will happen when the next check_connection interval fires.
+            }
+        }
+
+        function check_connection() {
+            if (!ws || ws.readyState == WebSocket.CLOSED) {
+                connect("{{ ws_uri }}");
+            }
+        }
+
+        // Open the initial websocket connection.
+        show_alert("Connecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>", "warning");
+        check_connection();
+        // Set up a timer to keep reconnecting on disconnect.
+        setInterval(check_connection, 5000);
     </script>
 {% endblock %}

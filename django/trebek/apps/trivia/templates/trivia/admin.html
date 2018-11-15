@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 
 {% block page_title %}Admin{% endblock %}
@@ -15,9 +16,21 @@
             width: 100%;
         }
 
+        #question-context {
+            display: none;
+        }
+
         #buzzed {
             color: blue;
             font-weight: bold;
+        }
+
+        img.reconnecting {
+            height: 1em;
+        }
+
+        #status {
+            display: none;
         }
     </style>
 {% endblock %}
@@ -25,13 +38,22 @@
 
 {% block page_content %}
     <div class="container">
-        <div class="row">
+        <div class="row" id="status">
             <div class="col">
-                <button type="button" class="btn btn-warning" id="back">Back</button>
+                <div class="alert" role="alert"></div>
             </div>
         </div>
-        <div class="row d-none" id="question-context">
-            <div class"col">
+        <div class="row">
+            <div class="col">
+                <button type="button" class="btn btn-success" id="start">Start</button>
+            </div>
+            <div class="col">
+                <button type="button" class="btn btn-danger" id="reset" disabled>Reset</button>
+            </div>
+        </div>
+        <hr/>
+        <div class="row" id="question-context">
+            <div class="col">
                 <div class="row" id="question-details">
                     <div class="col">
                         <span id="question-points"></span>
@@ -45,19 +67,26 @@
                 </div>
                 <div class="row" id="answer-controls">
                     <div class="col">
-                        <button type="button" class="btn btn-success" id="correct">Correct</button>
+                        <button type="button" class="btn btn-info" id="back">Back</button>
                     </div>
                     <div class="col">
-                        <button type="button" class="btn btn-danger" id="wrong">Wrong</button>
+                        <button type="button" class="btn btn-warning" id="skip">Skip</button>
                     </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-success needs-buzz" id="correct" disabled>Correct</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-danger needs-buzz" id="wrong" disabled>Wrong</button>
+                    </div>
+                </div>
+                <div class="row">
                     <div class="col">
                         Buzzed: <span id="buzzed"></span>
-                        <input type="hidden" id="question-id" val="" />
-                        <input type="hidden" id="buzzer-id" val="" />
                     </div>
                 </div>
             </div>
         </div>
+        <hr/>
         <div class="row">
             {% for category, questions in categories %}
                 <div class="col">
@@ -79,6 +108,21 @@
 {% block page_scripts %}
     <script type="text/javascript">
 
+        var msg_types = {
+            ERROR: 0,
+            ADMIN_CONNECTED: 1,
+            DISPLAY_CONNECTED: 2,
+            PLAYER_CONNECTED: 3,
+            GAME_START: 4,
+            GAME_RESET: 5,
+            POP_QUESTION: 6,
+            CLEAR_QUESTION: 7,
+            PLAYER_BUZZED: 8,
+            CLEAR_BUZZ: 9,
+            UPDATE_SCORE: 10,
+            PLAY_SOUND: 11,
+        };
+
         var question_data = {
             {% for category, questions in categories %}
                 {% for question in questions %}
@@ -86,120 +130,233 @@
                         text: "{{ question.text }}",
                         answer: "{{ question.answer }}",
                         points: {{ question.point_value }},
+                        answered: {{ question.answered|yesno:"true,false" }},
                     },
                 {% endfor %}
             {% endfor %}
+        };
+
+        var player_data = {
+            {% for player in players %}
+                {{ player.id }}: {
+                    name: "{{ player.name }}",
+                    score: {{ player.score }},
+                },
+            {% endfor %}
+        };
+
+        var ws = null;
+        var game_started = false;
+        var question_id = null;
+        var question = null;
+        var buzzing_player = null;
+
+        function player_buzzed(id, name) {
+            buzzing_player = id;
+            $("#buzzed").text(name);
+            $("#answer-controls .needs-buzz").attr("disabled", false);
+            send_message(msg_types.PLAY_SOUND, {
+                sound: "buzz",
+            });
         }
 
-        function can_buzz() {
-            ws.send(JSON.stringify({
-                type: "can_buzz",
-                game: "{{ game.key }}",
-            }));
-        }
-
-        function cant_buzz() {
-            ws.send(JSON.stringify({
-                type: "cant_buzz",
-                game: "{{ game.key }}",
-            }));
-        }
-
-        function player_buzzed(player_id, player_name) {
-            if ($("#buzzed").text() == "") {
-                $("#buzzed").text(player_name);
-                $("#buzzer-id").val(player_id);
-                $("#answer-controls button").attr("disabled", false);
-                ws.send(JSON.stringify({
-                    type: "play_sound",
-                    game: "{{ game.key }}",
-                    sound: "buzz",
-                }));
-                cant_buzz();
+        function clear_buzzed(no_message=false) {
+            $("#buzzed").text("");
+            $("#answer-controls .needs-buzz").attr("disabled", true);
+            if (!no_message) {
+                send_message(msg_types.CLEAR_BUZZ);
             }
+            buzzing_player = null;
+        }
+
+        function pop_question(id=null) {
+            if (id) {
+                question_id = id;
+                question = question_data[id];
+            }
+            $("#question-points").text(question.points);
+            $("#question-text").text(question.text);
+            $("#question-answer").text(question.answer);
+            $("#question-context").show();
+            send_message(msg_types.POP_QUESTION, {
+                question_id: parseInt(question_id),
+                question_text: question.text,
+            });
+        }
+
+        function clear_question(answered=false, no_message=false) {
+            clear_buzzed(true);
+            $("#question-context").hide();
+            if (!no_message) {
+                send_message(msg_types.CLEAR_QUESTION, {
+                    question_id: question_id,
+                    answered: answered,
+                });
+            }
+            if (answered) {
+                disable_question(question_id);
+            }
+            question = null;
+            question_id = null;
+        }
+
+        function disable_question(id) {
+            $("#question-" + id)
+                .addClass("btn-secondary")
+                .removeClass("btn-primary")
+                .attr("disabled", true);
+        }
+
+        function add_to_score(player_id, amount)
+        {
+            player_data[player_id].score += amount
+            send_message(msg_types.UPDATE_SCORE, {
+                player_id: player_id,
+                score: player_data[player_id].score,
+            });
+        }
+
+        function show_alert(html, alert_class="danger") {
+            $("#status .alert")
+                .html(html)
+                .removeClass("alert-primary alert-secondary alert-success alert-danger alert-warning alert-info")
+                .addClass("alert-" + alert_class);
+            $("#status").show();
+        }
+
+        function clear_alert() {
+            $("#status").hide();
+        }
+
+        function start_game(from_message=false) {
+            if (!from_message) {
+                send_message(msg_types.GAME_START);
+            }
+            game_started = true;
+            $("#start").attr("disabled", true);
+            $("#reset").attr("disabled", false);
+        }
+
+        function reset_game(from_message=false) {
+            game_started = false;
+            if (!from_message) {
+                send_message(msg_types.GAME_RESET);
+            }
+            $("#start").attr("disabled", false);
+            $("#reset").attr("disabled", true);
         }
 
         function parse_message(msg) {
-            if (msg.type == "buzz") {
-                player_buzzed(msg.player_id, msg.player_name);
+            switch (msg.type) {
+                case msg_types.ERROR:
+                    console.error("Received error from middleware:", msg.error);
+                    return;
+                case msg_types.ADMIN_CONNECTED:
+                    break;
+                case msg_types.PLAYER_CONNECTED:
+                    if (!(msg.player_id in player_data)) {
+                        player_data[msg.player_id] = {
+                            name: msg.player_name,
+                            score: msg.score,
+                        };
+                    }
+                    break;
+                case msg_types.GAME_START:
+                    start_game(true);
+                    break;
+                case msg_types.GAME_RESET:
+                    reset_game(true);
+                    break;
+                case msg_types.PLAYER_BUZZED:
+                    player_buzzed(msg.player_id, msg.player_name);
+                    break;
+                default:
+                    console.error("Unhandled msg.type:", msg.type);
+                    return;
+            }
+        }
+
+        function send_message(type, data={}) {
+            Object.assign(data, {
+                type: type,
+                game_key: "{{ game.key }}",
+            });
+            if (!ws || ws.readyState != WebSocket.OPEN) {
+                console.error("Could not send msg, websocket closed:", data);
+                return;
+            }
+            ws.send(JSON.stringify(data));
+        }
+
+        function connect(uri) {
+            ws = new WebSocket(uri);
+            ws.onopen = function (event) {
+                send_message(msg_types.ADMIN_CONNECTED);
+                clear_alert();
+                if (game_started) {
+                    // Make sure the middleware is up to date on the game state.
+                    send_message(msg_types.GAME_START);
+                }
+            };
+            ws.onmessage = function (event) {
+                var data = JSON.parse(event.data);
+                parse_message(data);
+            };
+            ws.onclose = function () {
+                show_alert("Reconnecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>");
+                clear_question(false, true);
+                // The reconnection attempt will happen when the next check_connection interval fires.
+            }
+        }
+
+        function check_connection() {
+            if (!ws || ws.readyState == WebSocket.CLOSED) {
+                connect("{{ ws_uri }}");
             }
         }
 
         $(".question").on("click", function () {
-            var question_id = $(this).attr("id").split("-")[1];
-            $("#question-points").text(question_data[question_id].points);
-            $("#question-text").text(question_data[question_id].text);
-            $("#question-answer").text(question_data[question_id].answer);
-            $("#buzzed").text("");
-            $("#buzzer-id").val("");
-            $("#question-id").val(question_id);
-            $("#answer-controls button").attr("disabled", true);
-            $("#question-context").removeClass("d-none");
-            ws.send(JSON.stringify({
-                type: "pop_question",
-                game: "{{ game.key }}",
-                id: parseInt(question_id),
-            }));
-            can_buzz();
+            pop_question($(this).attr("id").split("-")[1]);
         });
 
         $("#correct").on("click", function () {
-            var question_id = $("#question-id").val();
-            var question = $("#question-" + question_id);
-            var player_id = $("#buzzer-id").val();
-            ws.send(JSON.stringify({
-                type: "add_points",
-                game: "{{ game.key }}",
-                player: player_id,
-                points: question_data[question_id].points,
-            }));
-            ws.send(JSON.stringify({
-                type: "unpop_question",
-                game: "{{ game.key }}",
-                answered: true,
-            }));
-            $("#question-context").addClass("d-none");
-            question
-                .addClass("btn-secondary")
-                .removeClass("btn-primary")
-                .attr("disabled", true);
+            add_to_score(buzzing_player, question.points);
+            clear_question(true);
         });
 
         $("#wrong").on("click", function () {
-            var question_id = $("#question-id").val();
-            var player_id = $("#buzzer-id").val();
-            ws.send(JSON.stringify({
-                type: "add_points",
-                game: "{{ game.key }}",
-                player: player_id,
-                points: 0 - question_data[question_id].points,
-            }));
-            $("#buzzed").text("");
-            $("#buzzer-id").val("");
-            $("#answer-controls button").attr("disabled", true);
-            can_buzz();
+            add_to_score(buzzing_player, -question.points);
+            clear_buzzed(true);
+            pop_question();
         });
 
         $("#back").on("click", function () {
-            cant_buzz();
-            ws.send(JSON.stringify({
-                type: "unpop_question",
-                game: "{{ game.key }}",
-                answered: false,
-            }));
-            $("#question-context").addClass("d-none");
+            clear_question();
         });
 
-        ws = new WebSocket("{{ ws_uri }}");
-        ws.onopen = function (event) {
-            ws.send(JSON.stringify({
-                type: "register_admin",
-                game: "{{ game.key }}",
-            }));
-        };
-        ws.onmessage = function (event) {
-            var data = JSON.parse(event.data);
-            parse_message(data);
-        };
+        $("#skip").on("click", function () {
+            clear_question(true);
+        });
+
+        $("#start").on("click", function () {
+            start_game();
+        });
+
+        $("#reset").on("click", function () {
+            reset_game();
+        });
+
+        // Disable all the answered questions.
+        $.each(question_data, function (id, data) {
+            if (data.answered) {
+                disable_question(id);
+            }
+        });
+
+        // Open the initial websocket connection.
+        show_alert("Connecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>", "warning");
+        check_connection();
+        // Set up a timer to keep reconnecting on disconnect.
+        setInterval(check_connection, 5000);
     </script>
 {% endblock %}

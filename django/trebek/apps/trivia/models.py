@@ -55,6 +55,7 @@ class Game(models.Model):
     name = models.CharField(max_length=100)
     date = models.DateField()
     key = models.CharField(max_length=4, unique=True)
+    started = models.BooleanField(default=False)
 
     class Meta:
         ordering = ("date", "name")

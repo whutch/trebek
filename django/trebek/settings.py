@@ -135,6 +135,13 @@ STATICFILES_FINDERS = (
 )
 
 
+# SSL configuration for websockets
+
+ENABLE_SSL = False
+SSL_CERT_PATH = ""
+SSL_KEY_PATH = ""
+
+
 # Miscellaneous options
 
 APPEND_SLASH = True

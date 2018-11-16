@@ -9,6 +9,7 @@ import json
 import re
 import ssl
 
+from django.conf import settings
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -17,9 +18,7 @@ import websockets
 from .models import Game, Player, QuestionState
 
 
-ENABLE_SSL = False
-
-if ENABLE_SSL:
+if settings.ENABLE_SSL:
     WS_URI = "wss://{}:8765"
 else:
     WS_URI = "ws://{}:8765"
@@ -29,7 +28,7 @@ def msg(msg_type, msg_data):
     """Send a message to the middleware server."""
     async def send():
         uri = WS_URI.format("localhost")
-        ssl_context = True if ENABLE_SSL else None
+        ssl_context = True if settings.ENABLE_SSL else None
         async with websockets.connect(uri, ssl=ssl_context) as ws:
             msg_data["type"] = msg_type
             await ws.send(json.dumps(msg_data))

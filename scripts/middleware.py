@@ -22,14 +22,12 @@ DJANGO_DIR = join(BASE_DIR, "django")
 sys.path.insert(0, DJANGO_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "trebek.settings")
 django.setup()
+from trebek import settings
 from trebek.apps.trivia import models
 
 
 HOST_URL = "0.0.0.0"
 HOST_PORT = 8765
-ENABLE_SSL = False
-SSL_CERT_PATH = ""
-SSL_KEY_PATH = ""
 
 
 class MessageTypes:
@@ -326,9 +324,9 @@ async def handle_websocket(websocket, path):
 
 def start_middleware():
     log.info("Middleware started.")
-    if ENABLE_SSL:
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_context.load_cert_chain(SSL_CERT_PATH, SSL_KEY_PATH)
+    if settings.ENABLE_SSL:
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_context.load_cert_chain(certfile=settings.SSL_CERT_PATH, keyfile=settings.SSL_KEY_PATH)
     else:
         ssl_context = None
     server = websockets.serve(handle_websocket, HOST_URL, HOST_PORT, ssl=ssl_context)

@@ -8,7 +8,7 @@
 {% block page_styles %}
     <style>
         body {
-            background: black;
+            background: #020000;
         }
 
         .category, .question {
@@ -16,7 +16,6 @@
             width: 100%;
             padding-bottom: 75%;
 
-            background: #3f48cc;
             text-transform: uppercase;
             text-align: center;
             text-shadow: 0.08em 0.08em black;
@@ -33,14 +32,16 @@
             margin-top: 10px;
             margin-bottom: 30px;
 
-            color: white;
+            background: #7d5120;
+            color: #fcfbf6;
             font-size: 125%;
         }
 
         .question {
             margin-bottom: 10px;
 
-            color: #ffc90e;
+            background: #6d2d00;
+            color: #ffe386;
             font-size: 250%;
         }
 
@@ -49,8 +50,8 @@
             z-index: 999;
             padding: 1em 0.6em;
 
-            background: #3f48cc;
-            color: white;
+            background: #6d2d00;
+            color: #fcfbf6;
             font-size: 60%;
             text-transform: uppercase;
             text-align: center;
@@ -116,7 +117,7 @@
         };
 
         var sounds = {
-            buzz: new Audio("{% static 'trebek/sounds/buzz.ogg' %}"),
+            buzz: new Audio("{% static 'trebek/sounds/gobble.ogg' %}"),
         };
 
         var ws = null;

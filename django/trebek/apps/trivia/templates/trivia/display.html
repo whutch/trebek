@@ -107,6 +107,10 @@
             left: 0 !important;
             font-size: 500%;
         }
+
+        img.reconnecting {
+            height: 1em;
+        }
     </style>
 {% endblock %}
 
@@ -127,7 +131,6 @@
                 </div>
             {% endfor %}
         </div>
-        <input type="hidden" id="question-id" val="" />
     </div>
     <div id="landing">
         <div class="row">
@@ -142,6 +145,9 @@
         </div>
     </div>
     <div id="scoreboard"></div>
+    <div id="status">
+        <div class="alert" role="alert"></div>
+    </div>
 {% endblock %}
 
 
@@ -261,16 +267,16 @@
         }
 
         function show_alert(html, alert_class="danger") {
-            if (true) return;
             $("#status .alert")
                 .html(html)
-                .removeClass("alert-primary alert-secondary alert-success alert-danger alert-warning alert-info")
+                .removeClass(function (index, classes) {
+                    return (classes.match(/(^|\s)alert-\S+/g) || []).join(' ');
+                })
                 .addClass("alert-" + alert_class);
             $("#status").show();
         }
 
         function clear_alert() {
-            if (true) return;
             $("#status").hide();
         }
 
@@ -283,6 +289,8 @@
                     $("#landing").hide();
                     break;
                 case msg_types.GAME_RESET:
+                    // We don't track much state, so just reload the page.
+                    location.reload();
                     break;
                 case msg_types.POP_QUESTION:
                     pop_question(msg.question_id, msg.question_text);

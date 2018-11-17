@@ -143,6 +143,8 @@ class Client:
         raise NotImplementedError
 
     async def send_message(self, msg_type, msg_data={}):
+        # Building these dicts is inefficient when send_message is called in a loop with the same data,
+        #  but it's fine for our small-scale purposes now.
         if not self._ws.open:
             return
         msg = {}
@@ -178,8 +180,14 @@ class Admin(Client):
                     continue
                 await client.send_message(MessageTypes.GAME_START)
         elif msg_type == MessageTypes.GAME_RESET:
-            self.game.started = False
             log.info(f"Reseting game {self.game.key}.")
+            self.game.started = False
+            # Delete all game states.
+            models.QuestionState.objects.filter(game__key=self.game.key).delete()
+            # Reset all scores.
+            for player in models.Player.objects.filter(game__key=self.game.key):
+                player.score = 0
+                player.save()
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 if client is self:
@@ -320,12 +328,13 @@ async def create_client(websocket):
 
 
 async def handle_websocket(websocket, path):
-    log.info("New connection.")
+    host = websocket.remote_address[0]
+    log.info(f"New connection from {host}.")
     try:
         client = await create_client(websocket)
         await client.handler()
     except websockets.ConnectionClosed:
-        log.info("Lost connection.")
+        log.info(f"Lost connection from {host}.")
     else:
         await websocket.close()
 

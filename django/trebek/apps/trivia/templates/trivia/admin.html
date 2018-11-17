@@ -223,7 +223,9 @@
         function show_alert(html, alert_class="danger") {
             $("#status .alert")
                 .html(html)
-                .removeClass("alert-primary alert-secondary alert-success alert-danger alert-warning alert-info")
+                .removeClass(function (index, classes) {
+                    return (classes.match(/(^|\s)alert-\S+/g) || []).join(' ');
+                })
                 .addClass("alert-" + alert_class);
             $("#status").show();
         }
@@ -250,6 +252,7 @@
             $("#start").attr("disabled", false);
             $("#reset").attr("disabled", true);
             $("#scoreboard").attr("disabled", true);
+            clear_question(false, true);
         }
 
         function parse_message(msg) {

@@ -50,6 +50,9 @@
             <div class="col">
                 <button type="button" class="btn btn-danger" id="reset" disabled>Reset</button>
             </div>
+            <div class="col">
+                <button type="button" class="btn btn-info" id="scoreboard" disabled>Scoreboard</button>
+            </div>
         </div>
         <hr/>
         <div class="row" id="question-context">
@@ -121,6 +124,7 @@
             CLEAR_BUZZ: 9,
             UPDATE_SCORE: 10,
             PLAY_SOUND: 11,
+            TOGGLE_SCOREBOARD: 12,
         };
 
         var question_data = {
@@ -235,6 +239,7 @@
             game_started = true;
             $("#start").attr("disabled", true);
             $("#reset").attr("disabled", false);
+            $("#scoreboard").attr("disabled", false);
         }
 
         function reset_game(from_message=false) {
@@ -244,6 +249,7 @@
             }
             $("#start").attr("disabled", false);
             $("#reset").attr("disabled", true);
+            $("#scoreboard").attr("disabled", true);
         }
 
         function parse_message(msg) {
@@ -344,6 +350,10 @@
 
         $("#reset").on("click", function () {
             reset_game();
+        });
+
+        $("#scoreboard").on("click", function () {
+            send_message(msg_types.TOGGLE_SCOREBOARD);
         });
 
         // Disable all the answered questions.

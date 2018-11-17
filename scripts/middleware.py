@@ -43,6 +43,7 @@ class MessageTypes:
     CLEAR_BUZZ = 9
     UPDATE_SCORE = 10
     PLAY_SOUND = 11
+    TOGGLE_SCOREBOARD = 12
 
 
 logging.basicConfig(level=logging.INFO)
@@ -220,10 +221,17 @@ class Admin(Client):
             log.info(f"Received score update for player '{player.name}' ({player.id}) of game {self.game.key}, new value is {score}.")
             player.score = score
             player.save()
+            # Pass it on to the displays.
+            for display in self.game.displays:
+                await display.send_message(MessageTypes.UPDATE_SCORE, msg_data)
         elif msg_type == MessageTypes.PLAY_SOUND:
             # Pass it on to the displays and players.
             for client in itertools.chain(self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.PLAY_SOUND, msg_data)
+        elif msg_type == MessageTypes.TOGGLE_SCOREBOARD:
+            # Pass it on to the displays.
+            for display in self.game.displays:
+                await display.send_message(MessageTypes.TOGGLE_SCOREBOARD)
         else:
             log.warning(f"Admin sent unhandled message type '{msg_type}': {msg_data}")
 

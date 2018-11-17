@@ -90,10 +90,19 @@ class Game:
         self.admins = set()
         self.displays = set()
         self.players = set()
-        self.started = False
         self.popped_question_uuid = None
         self.popped_question_real_id = None
+        self._game = models.Game.objects.get(key=game_key)
         GAMES[game_key] = self
+
+    @property
+    def started(self):
+        return self._game.started
+
+    @started.setter
+    def started(self, value):
+        self._game.started = value
+        self._game.save()
 
     def register_client(self, client):
         if isinstance(client, Admin):

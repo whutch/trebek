@@ -103,11 +103,12 @@ def admin(request, game_key):
     for category in game.categories.all():
         questions = []
         for question in category.questions.all():
-            question_data = {}
-            question_data["id"] = question.id
-            question_data["text"] = question.text
-            question_data["answer"] = question.answer
-            question_data["point_value"] = question.point_value
+            question_data = {
+                "id": question.id,
+                "text": question.text,
+                "answer": question.answer,
+                "point_value": question.point_value,
+            }
             try:
                 state = question.questionstate_set.get(game=game)
             except QuestionState.DoesNotExist:
@@ -127,15 +128,24 @@ def admin(request, game_key):
 
 def display(request, game_key):
     game = get_object_or_404(Game, key=game_key)
+    context = {
+        "game": game,
+        "players": Player.objects.filter(game=game),
+        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0])
+    }
+    if not game.started:
+        context["host_url"] = request.META["HTTP_HOST"]
+        return render(request, "trivia/display_landing.html", context)
     categories = []
     for category in game.categories.all():
         questions = []
         for question in category.questions.all():
-            question_data = {}
-            question_data["id"] = question.id
-            question_data["text"] = question.text
-            question_data["answer"] = question.answer
-            question_data["point_value"] = question.point_value
+            question_data = {
+                "id": question.id,
+                "text": question.text,
+                "answer": question.answer,
+                "point_value": question.point_value,
+            }
             try:
                 state = question.questionstate_set.get(game=game)
             except QuestionState.DoesNotExist:
@@ -143,13 +153,7 @@ def display(request, game_key):
             question_data["answered"] = state.answered if state else False
             questions.append(question_data)
         categories.append([category, questions])
-    players = Player.objects.filter(game=game)
-    context = {
-        "game": game,
-        "categories": categories,
-        "players": players,
-        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0])
-    }
+    context["categories"] = categories
     return render(request, "trivia/display.html", context)
 
 

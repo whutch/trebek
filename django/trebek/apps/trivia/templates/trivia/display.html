@@ -11,9 +11,10 @@
             background: black;
         }
 
-        #landing {
+        #scoreboard {
+            display: none;
             position: absolute;
-            z-index: 999;
+            z-index: 10;
             padding: 1em 0.6em;
             width: 100vw;
             height: 100vh;
@@ -28,22 +29,14 @@
             text-shadow: 0.08em 0.08em black;
         }
 
-        #scoreboard {
+        #status {
             display: none;
             position: absolute;
-            z-index: 999;
-            padding: 1em 0.6em;
-            width: 100vw;
-            height: 100vh;
-            top: 0;
+            bottom: 0;
             left: 0;
-
-            background: #3f48cc;
-            color: white;
-            font-size: 500%;
-            text-transform: uppercase;
-            text-align: center;
-            text-shadow: 0.08em 0.08em black;
+            z-index: 30;
+            margin: 0 1.5em;
+            padding: 1em 0.2em;
         }
 
         .category, .question {
@@ -81,7 +74,7 @@
 
         .question-popup {
             position: absolute;
-            z-index: 998;
+            z-index: 9;
             padding: 1em 0.6em;
 
             background: #3f48cc;
@@ -130,18 +123,6 @@
                     {% endfor %}
                 </div>
             {% endfor %}
-        </div>
-    </div>
-    <div id="landing">
-        <div class="row">
-            <div class="col">
-                <h1>Get ready..</h1>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col">
-                <h1>https://xom.whutch.com/trivia</h1>
-            </div>
         </div>
     </div>
     <div id="scoreboard"></div>
@@ -286,7 +267,7 @@
                     console.error("Received error from middleware:", msg.error);
                     return;
                 case msg_types.GAME_START:
-                    $("#landing").hide();
+                    // We wouldn't be on this page if the game wasn't started, just ignore it.
                     break;
                 case msg_types.GAME_RESET:
                     // We don't track much state, so just reload the page.

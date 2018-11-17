@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% load static %}
+
+
+{% block page_title %}Display{% endblock %}
+
+
+{% block page_styles %}
+    <style>
+        body {
+            background: #3f48cc;
+            color: white;
+            font-size: 500%;
+        }
+
+        #status {
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            z-index: 30;
+            margin: 0 1.5em;
+            padding: 1em 0.2em;
+        }
+
+        img.reconnecting {
+            height: 1em;
+        }
+    </style>
+{% endblock %}
+
+
+{% block page_content %}
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                <h1>Get ready..</h1>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                <h1>{{ host_url }}/trivia</h1>
+            </div>
+        </div>
+    </div>
+    <div id="status">
+        <div class="alert" role="alert"></div>
+    </div>
+{% endblock %}
+
+
+{% block page_scripts %}
+    <script type="text/javascript">
+
+        var msg_types = {
+            ERROR: 0,
+            ADMIN_CONNECTED: 1,
+            DISPLAY_CONNECTED: 2,
+            PLAYER_CONNECTED: 3,
+            GAME_START: 4,
+            GAME_RESET: 5,
+            POP_QUESTION: 6,
+            CLEAR_QUESTION: 7,
+            PLAYER_BUZZED: 8,
+            CLEAR_BUZZ: 9,
+            UPDATE_SCORE: 10,
+            PLAY_SOUND: 11,
+            TOGGLE_SCOREBOARD: 12,
+        };
+
+        var sounds = {
+            buzz: new Audio("{% static 'trebek/sounds/buzz.ogg' %}"),
+        };
+
+        var ws = null;
+
+        function play_sound(sound) {
+            var snd = sounds[sound];
+            snd.currentTime = 0;
+            snd.play();
+        }
+
+        function show_alert(html, alert_class="danger") {
+            $("#status .alert")
+                .html(html)
+                .removeClass(function (index, classes) {
+                    return (classes.match(/(^|\s)alert-\S+/g) || []).join(' ');
+                })
+                .addClass("alert-" + alert_class);
+            $("#status").show();
+        }
+
+        function clear_alert() {
+            $("#status").hide();
+        }
+
+        function parse_message(msg) {
+            switch (msg.type) {
+                case msg_types.ERROR:
+                    console.error("Received error from middleware:", msg.error);
+                    return;
+                case msg_types.PLAYER_CONNECTED:
+                    break;
+                case msg_types.GAME_START:
+                case msg_types.GAME_RESET:
+                    location.reload();
+                    break;
+                case msg_types.PLAY_SOUND:
+                    play_sound(msg.sound);
+                    break;
+                default:
+                    console.error("Unhandled msg.type:", msg.type);
+                    return;
+            }
+        }
+
+        function send_message(type, data={}) {
+            Object.assign(data, {
+                type: type,
+                game_key: "{{ game.key }}",
+            });
+            if (!ws || ws.readyState != WebSocket.OPEN) {
+                console.error("Could not send msg, websocket closed:", data);
+                return;
+            }
+            ws.send(JSON.stringify(data));
+        }
+
+        function connect(uri) {
+            ws = new WebSocket(uri);
+            ws.onopen = function (event) {
+                send_message(msg_types.DISPLAY_CONNECTED);
+                clear_alert();
+            };
+            ws.onmessage = function (event) {
+                var data = JSON.parse(event.data);
+                parse_message(data);
+            };
+            ws.onclose = function () {
+                show_alert("Reconnecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>");
+                // The reconnection attempt will happen when the next check_connection interval fires.
+            }
+        }
+
+        function check_connection() {
+            if (!ws || ws.readyState == WebSocket.CLOSED) {
+                connect("{{ ws_uri }}");
+            }
+        }
+
+        // Open the initial websocket connection.
+        show_alert("Connecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>", "warning");
+        check_connection();
+        // Set up a timer to keep reconnecting on disconnect.
+        setInterval(check_connection, 5000);
+    </script>
+{% endblock %}

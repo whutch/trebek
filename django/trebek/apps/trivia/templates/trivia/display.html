@@ -11,6 +11,23 @@
             background: black;
         }
 
+        #landing {
+            position: absolute;
+            z-index: 999;
+            padding: 1em 0.6em;
+            width: 100vw;
+            height: 100vh;
+            top: 0;
+            left: 0;
+
+            background: #3f48cc;
+            color: white;
+            font-size: 500%;
+            text-transform: uppercase;
+            text-align: center;
+            text-shadow: 0.08em 0.08em black;
+        }
+
         #scoreboard {
             display: none;
             position: absolute;
@@ -111,6 +128,18 @@
             {% endfor %}
         </div>
         <input type="hidden" id="question-id" val="" />
+    </div>
+    <div id="landing">
+        <div class="row">
+            <div class="col">
+                <h1>Get ready..</h1>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                <h1>https://xom.whutch.com/trivia</h1>
+            </div>
+        </div>
     </div>
     <div id="scoreboard"></div>
 {% endblock %}
@@ -251,6 +280,7 @@
                     console.error("Received error from middleware:", msg.error);
                     return;
                 case msg_types.GAME_START:
+                    $("#landing").hide();
                     break;
                 case msg_types.GAME_RESET:
                     break;

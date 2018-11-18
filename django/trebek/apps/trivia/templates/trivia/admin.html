@@ -11,6 +11,10 @@
             margin-top: 0.5em;
         }
 
+        .category {
+            min-height: 4em;
+        }
+
         button.question {
             margin-bottom: 0.5em;
             width: 100%;
@@ -81,6 +85,9 @@
                     <div class="col">
                         <button type="button" class="btn btn-danger needs-buzz" id="wrong" disabled>Wrong</button>
                     </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-secondary needs-buzz" id="clear-buzz" disabled>Clear</button>
+                    </div>
                 </div>
                 <div class="row">
                     <div class="col">
@@ -131,8 +138,8 @@
             {% for category, questions in categories %}
                 {% for question in questions %}
                     {{ question.id }}: {
-                        text: "{{ question.text }}",
-                        answer: "{{ question.answer }}",
+                        text: `{{ question.text|safe }}`,
+                        answer: `{{ question.answer|safe }}`,
                         points: {{ question.point_value }},
                         answered: {{ question.answered|yesno:"true,false" }},
                     },
@@ -155,13 +162,15 @@
         var question = null;
         var buzzing_player = null;
 
-        function player_buzzed(id, name) {
+        function player_buzzed(id, name, no_sound=false) {
             buzzing_player = id;
             $("#buzzed").text(name);
             $("#answer-controls .needs-buzz").attr("disabled", false);
-            send_message(msg_types.PLAY_SOUND, {
-                sound: "buzz",
-            });
+            if (!no_sound) {
+                send_message(msg_types.PLAY_SOUND, {
+                    sound: "buzz",
+                });
+            }
         }
 
         function clear_buzzed(no_message=false) {
@@ -173,7 +182,7 @@
             buzzing_player = null;
         }
 
-        function pop_question(id=null) {
+        function pop_question(id=null, no_message=false) {
             if (id) {
                 question_id = id;
                 question = question_data[id];
@@ -182,10 +191,12 @@
             $("#question-text").text(question.text);
             $("#question-answer").text(question.answer);
             $("#question-context").show();
-            send_message(msg_types.POP_QUESTION, {
-                question_id: parseInt(question_id),
-                question_text: question.text,
-            });
+            if (!no_message) {
+                send_message(msg_types.POP_QUESTION, {
+                    question_id: parseInt(question_id),
+                    question_text: question.text,
+                });
+            }
         }
 
         function clear_question(answered=false, no_message=false) {
@@ -234,8 +245,8 @@
             $("#status").hide();
         }
 
-        function start_game(from_message=false) {
-            if (!from_message) {
+        function start_game(no_message=false) {
+            if (!no_message) {
                 send_message(msg_types.GAME_START);
             }
             game_started = true;
@@ -244,9 +255,9 @@
             $("#scoreboard").attr("disabled", false);
         }
 
-        function reset_game(from_message=false) {
+        function reset_game(no_message=false) {
             game_started = false;
-            if (!from_message) {
+            if (!no_message) {
                 send_message(msg_types.GAME_RESET);
             }
             $("#start").attr("disabled", false);
@@ -276,8 +287,11 @@
                 case msg_types.GAME_RESET:
                     reset_game(true);
                     break;
+                case msg_types.POP_QUESTION:
+                    pop_question(msg.question_id, true);
+                    break;
                 case msg_types.PLAYER_BUZZED:
-                    player_buzzed(msg.player_id, msg.player_name);
+                    player_buzzed(msg.player_id, msg.player_name, msg.no_sound);
                     break;
                 default:
                     console.error("Unhandled msg.type:", msg.type);
@@ -335,6 +349,11 @@
 
         $("#wrong").on("click", function () {
             add_to_score(buzzing_player, -question.points);
+            clear_buzzed(true);
+            pop_question();
+        });
+
+        $("#clear-buzz").on("click", function () {
             clear_buzzed(true);
             pop_question();
         });

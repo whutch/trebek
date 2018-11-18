@@ -85,6 +85,9 @@
                     <div class="col">
                         <button type="button" class="btn btn-danger needs-buzz" id="wrong" disabled>Wrong</button>
                     </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-secondary needs-buzz" id="clear-buzz" disabled>Clear</button>
+                    </div>
                 </div>
                 <div class="row">
                     <div class="col">
@@ -346,6 +349,11 @@
 
         $("#wrong").on("click", function () {
             add_to_score(buzzing_player, -question.points);
+            clear_buzzed(true);
+            pop_question();
+        });
+
+        $("#clear-buzz").on("click", function () {
             clear_buzzed(true);
             pop_question();
         });

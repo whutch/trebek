@@ -153,6 +153,7 @@
 
         var sounds = {
             buzz: new Audio("{% static 'trebek/sounds/buzz.ogg' %}"),
+            time: null,
         };
 
         var player_data = {
@@ -170,6 +171,9 @@
 
         function play_sound(sound) {
             var snd = sounds[sound];
+            if (!snd) {
+                return;
+            }
             snd.currentTime = 0;
             snd.play();
         }

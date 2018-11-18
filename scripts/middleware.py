@@ -43,6 +43,7 @@ class MessageTypes:
     CLEAR_BUZZ = 9
     UPDATE_SCORE = 10
     PLAY_SOUND = 11
+    TOGGLE_SCOREBOARD = 12
 
 
 logging.basicConfig(level=logging.INFO)
@@ -89,10 +90,19 @@ class Game:
         self.admins = set()
         self.displays = set()
         self.players = set()
-        self.started = False
         self.popped_question_uuid = None
         self.popped_question_real_id = None
+        self._game = models.Game.objects.get(key=game_key)
         GAMES[game_key] = self
+
+    @property
+    def started(self):
+        return self._game.started
+
+    @started.setter
+    def started(self, value):
+        self._game.started = value
+        self._game.save()
 
     def register_client(self, client):
         if isinstance(client, Admin):
@@ -142,6 +152,8 @@ class Client:
         raise NotImplementedError
 
     async def send_message(self, msg_type, msg_data={}):
+        # Building these dicts is inefficient when send_message is called in a loop with the same data,
+        #  but it's fine for our small-scale purposes now.
         if not self._ws.open:
             return
         msg = {}
@@ -177,8 +189,14 @@ class Admin(Client):
                     continue
                 await client.send_message(MessageTypes.GAME_START)
         elif msg_type == MessageTypes.GAME_RESET:
-            self.game.started = False
             log.info(f"Reseting game {self.game.key}.")
+            self.game.started = False
+            # Delete all game states.
+            models.QuestionState.objects.filter(game__key=self.game.key).delete()
+            # Reset all scores.
+            for player in models.Player.objects.filter(game__key=self.game.key):
+                player.score = 0
+                player.save()
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 if client is self:
@@ -220,10 +238,17 @@ class Admin(Client):
             log.info(f"Received score update for player '{player.name}' ({player.id}) of game {self.game.key}, new value is {score}.")
             player.score = score
             player.save()
+            # Pass it on to the displays.
+            for display in self.game.displays:
+                await display.send_message(MessageTypes.UPDATE_SCORE, msg_data)
         elif msg_type == MessageTypes.PLAY_SOUND:
             # Pass it on to the displays and players.
             for client in itertools.chain(self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.PLAY_SOUND, msg_data)
+        elif msg_type == MessageTypes.TOGGLE_SCOREBOARD:
+            # Pass it on to the displays.
+            for display in self.game.displays:
+                await display.send_message(MessageTypes.TOGGLE_SCOREBOARD)
         else:
             log.warning(f"Admin sent unhandled message type '{msg_type}': {msg_data}")
 
@@ -312,12 +337,13 @@ async def create_client(websocket):
 
 
 async def handle_websocket(websocket, path):
-    log.info("New connection.")
+    host = websocket.remote_address[0]
+    log.info(f"New connection from {host}.")
     try:
         client = await create_client(websocket)
         await client.handler()
     except websockets.ConnectionClosed:
-        log.info("Lost connection.")
+        log.info(f"Lost connection from {host}.")
     else:
         await websocket.close()
 

@@ -11,6 +11,34 @@
             background: #020000;
         }
 
+        #scoreboard {
+            display: none;
+            position: absolute;
+            z-index: 10;
+            padding: 1em 0.6em;
+            width: 100vw;
+            height: 100vh;
+            top: 0;
+            left: 0;
+
+            background: #3f48cc;
+            color: white;
+            font-size: 500%;
+            text-transform: uppercase;
+            text-align: center;
+            text-shadow: 0.08em 0.08em black;
+        }
+
+        #status {
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            z-index: 30;
+            margin: 0 1.5em;
+            padding: 1em 0.2em;
+        }
+
         .category, .question {
             position: relative;
             width: 100%;
@@ -47,7 +75,7 @@
 
         .question-popup {
             position: absolute;
-            z-index: 999;
+            z-index: 9;
             padding: 1em 0.6em;
 
             background: #6d2d00;
@@ -73,6 +101,10 @@
             left: 0 !important;
             font-size: 500%;
         }
+
+        img.reconnecting {
+            height: 1em;
+        }
     </style>
 {% endblock %}
 
@@ -93,7 +125,10 @@
                 </div>
             {% endfor %}
         </div>
-        <input type="hidden" id="question-id" val="" />
+    </div>
+    <div id="scoreboard"></div>
+    <div id="status">
+        <div class="alert" role="alert"></div>
     </div>
 {% endblock %}
 
@@ -114,10 +149,20 @@
             CLEAR_BUZZ: 9,
             UPDATE_SCORE: 10,
             PLAY_SOUND: 11,
+            TOGGLE_SCOREBOARD: 12,
         };
 
         var sounds = {
             buzz: new Audio("{% static 'trebek/sounds/gobble.ogg' %}"),
+        };
+
+        var player_data = {
+            {% for player in players %}
+                {{ player.id }}: {
+                    name: "{{ player.name }}",
+                    score: {{ player.score }},
+                },
+            {% endfor %}
         };
 
         var ws = null;
@@ -167,22 +212,53 @@
             $("#question-" + id).children("p").text("");
         }
 
-        function set_score(player_id, amount)
-        {
+        function set_score(player_id, value) {
+            player_data[player_id].score = value;
+            refresh_scoreboard();
+        }
 
+        function refresh_scoreboard() {
+            var was_hidden = $("#scoreboard").is(":hidden");
+            $("#scoreboard").remove();
+            var sorted_players = [];
+            $.each(player_data, function (index, player) {
+                sorted_players.push(player);
+            });
+            sorted_players.sort(function (a, b) {
+                return b.score - a.score;
+            });
+            var scoreboard = $("<div id='scoreboard'></div>").appendTo($("body"));
+            var score_list = $("<ol></ol>").appendTo(scoreboard);
+            $.each(sorted_players, function (index, player) {
+                var player_entry = $("<li></li>").appendTo(score_list);
+                player_entry.text(player.score + " - " + player.name)
+            });
+            if (!was_hidden) {
+                scoreboard.show();
+            }
+        }
+
+        function toggle_scoreboard() {
+            var scoreboard = $("#scoreboard");
+            if (scoreboard.is(":hidden")) {
+                scoreboard.show();
+            }
+            else {
+                scoreboard.hide();
+            }
         }
 
         function show_alert(html, alert_class="danger") {
-            if (true) return;
             $("#status .alert")
                 .html(html)
-                .removeClass("alert-primary alert-secondary alert-success alert-danger alert-warning alert-info")
+                .removeClass(function (index, classes) {
+                    return (classes.match(/(^|\s)alert-\S+/g) || []).join(' ');
+                })
                 .addClass("alert-" + alert_class);
             $("#status").show();
         }
 
         function clear_alert() {
-            if (true) return;
             $("#status").hide();
         }
 
@@ -192,8 +268,11 @@
                     console.error("Received error from middleware:", msg.error);
                     return;
                 case msg_types.GAME_START:
+                    // We wouldn't be on this page if the game wasn't started, just ignore it.
                     break;
                 case msg_types.GAME_RESET:
+                    // We don't track much state, so just reload the page.
+                    location.reload();
                     break;
                 case msg_types.POP_QUESTION:
                     pop_question(msg.question_id, msg.question_text);
@@ -204,10 +283,13 @@
                 case msg_types.PLAYER_BUZZED:
                     break;
                 case msg_types.UPDATE_SCORE:
-                    set_score(msg.player_id, msg.value);
+                    set_score(msg.player_id, msg.score);
                     break;
                 case msg_types.PLAY_SOUND:
                     play_sound(msg.sound);
+                    break;
+                case msg_types.TOGGLE_SCOREBOARD:
+                    toggle_scoreboard();
                     break;
                 default:
                     console.error("Unhandled msg.type:", msg.type);
@@ -249,6 +331,7 @@
             }
         }
 
+        refresh_scoreboard();
         // Open the initial websocket connection.
         show_alert("Connecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>", "warning");
         check_connection();

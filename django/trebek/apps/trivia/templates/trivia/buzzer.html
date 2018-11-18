@@ -79,6 +79,7 @@
             CLEAR_BUZZ: 9,
             UPDATE_SCORE: 10,
             PLAY_SOUND: 11,
+            TOGGLE_SCOREBOARD: 12,
         };
 
         var button_states = {
@@ -191,10 +192,8 @@
                     check_ready_state();
                     break;
                 case msg_types.GAME_RESET:
-                    game_started = false;
-                    question_id = null;
-                    player_buzzed = false;
-                    check_ready_state();
+                    // We don't track much state, so just reload the page.
+                    location.reload();
                     break;
                 case msg_types.POP_QUESTION:
                     question_id = msg.question_id;

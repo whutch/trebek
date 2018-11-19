@@ -363,6 +363,9 @@
         });
 
         $("#skip").on("click", function () {
+            send_message(msg_types.PLAY_SOUND, {
+                sound: "time",
+            });
             clear_question(true);
         });
 

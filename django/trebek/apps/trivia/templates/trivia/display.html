@@ -185,12 +185,16 @@
             clear_question();
             question_id = id;
             var question_box = $("#question-" + question_id);
+            if (!question_box[0]) {
+                // Not a question we know about, just use the first box as an anchor.
+                question_box = $(".question:first");
+            }
             var popup = $("<div class='question-popup'></div>").appendTo($("body"));
+            var popup_text = $("<p></p>").appendTo(popup);
+            popup_text.text(text);
             popup.width(question_box.width());
             popup.height(question_box.outerHeight());
             popup.css(question_box.offset());
-            var popup_text = $("<p></p>").appendTo(popup);
-            popup_text.text(text);
             setTimeout(function() {
                 popup.addClass("question-popup-fs");
             }, 200);

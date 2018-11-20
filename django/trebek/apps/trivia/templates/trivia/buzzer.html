@@ -9,6 +9,7 @@
     <style>
         body {
             background: black;
+            color: white;
         }
 
         #buttons {
@@ -16,8 +17,7 @@
         }
 
         #buzzer {
-            margin-left: 20vw;
-            width: 50vw;
+            width: 100%;
             font-size: 200%;
         }
 
@@ -27,15 +27,16 @@
 
         #question p {
             margin-top: 15vh;
-            width: 70vw;
 
             background: #3f48cc;
             text-transform: uppercase;
             text-align: center;
             text-shadow: 0.08em 0.08em black;
-
-            color: #ffc90e;
             font-size: 250%;
+        }
+
+        .btn-success, .btn-danger, .btn-secondary {
+            text-shadow: 0.08em 0.08em black;
         }
 
         img.reconnecting {
@@ -48,14 +49,14 @@
 {% block page_content %}
     <div class="container">
         <div class="row" id="buttons">
-            <div class="col-md">
+            <div class="col">
                 <button type="button" id="buzzer" class="btn btn-danger btn-lg" id="buzzer" disabled="true">
                     Connecting.. <img class="reconnecting" src="{% static 'trebek/reconnecting.svg' %}"/>
                 </button>
             </div>
         </div>
         <div class="row" id="question">
-            <div class="col-sm">
+            <div class="col">
                 <p></p>
             </div>
         </div>
@@ -132,8 +133,8 @@
                     button_class = "btn-secondary";
                     break;
                 case button_states.READY:
-                    button_contents = "Buzz!";
-                    button_class = "btn-primary";
+                    button_contents = "BUZZ!";
+                    button_class = "btn-success";
                     disabled = false;
                     break;
                 default:
@@ -170,11 +171,13 @@
         }
 
         function show_question(question_text) {
+            $("body").css("background", "#3f48cc");
             $("#question p").html(question_text);
             $("#question").show();
         }
 
         function hide_question() {
+            $("body").css("background", "black");
             $("#question").hide();
         }
 

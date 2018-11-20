@@ -9,7 +9,7 @@
     <style>
         body {
             background: black;
-            color: white;
+            color: #fcfbf6;
         }
 
         h1 {
@@ -36,8 +36,8 @@
             margin-top: 0.3em;
             padding-left: 0.4em;
 
-            background: #3f48cc;
-            color: white;
+            background: #6d2d00;
+            color: #ffe386;
             font-size: 250%;
             text-shadow: 0.08em 0.08em black;
         }
@@ -55,6 +55,18 @@
         img.reconnecting {
             height: 1em;
         }
+
+        img.turkey-left {
+            height: 7em;
+            position: absolute;
+            right: 0;
+        }
+
+        img.turkey-right {
+            height: 7em;
+            position: absolute;
+            left: 0;
+        }
     </style>
 {% endblock %}
 
@@ -63,7 +75,7 @@
     <div class="container">
         <div class="row">
             <div class="col">
-                <h1>Jeopardy</h1>
+                <h1>Hutcheson Thanksgiving Jeopardy</h1>
             </div>
         </div>
         <div class="row">
@@ -72,8 +84,14 @@
             </div>
         </div>
         <div class="row">
-            <div class="col">
+            <div class="col-md-3">
+                <img class="turkey-left" src="{% static 'trebek/turkey-left.gif' %}"/>
+            </div>
+            <div class="col-md-6">
                 <h2>Game Key: {{ game.key }}</h2>
+            </div>
+            <div class="col-md-3">
+                <img class="turkey-right" src="{% static 'trebek/turkey-right.gif' %}"/>
             </div>
         </div>
         <div id="player-list" class="row">

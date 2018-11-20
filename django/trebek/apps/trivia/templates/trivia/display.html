@@ -152,8 +152,14 @@
         };
 
         var sounds = {
-            buzz: new Audio("{% static 'trebek/sounds/buzz.ogg' %}"),
-            time: null,
+            buzz: {
+                path: "{% static 'trebek/sounds/buzz.ogg' %}",
+                volume: 0.5,
+            },
+            time: {
+                path: null,
+                volume: 1,
+            },
         };
 
         var player_data = {
@@ -169,13 +175,26 @@
         var game_started = false;
         var question_id = null;
 
-        function play_sound(sound) {
-            var snd = sounds[sound];
-            if (!snd) {
+        function preload_sounds() {
+            $.each(sounds, function (index, sound) {
+                if (sound.path) {
+                    sound.audio = new Audio(sound.path);
+                    sound.audio.volume = sound.volume;
+                }
+            });
+        }
+
+        function play_sound(sound_name) {
+            var sound = sounds[sound_name];
+            if (!sound || sound.disabled) {
                 return;
             }
-            snd.currentTime = 0;
-            snd.play();
+            var audio = sound.audio;
+            if (!audio) {
+                return;
+            }
+            audio.currentTime = 0;
+            audio.play();
         }
 
         function pop_question(id, text) {
@@ -338,6 +357,7 @@
             }
         }
 
+        preload_sounds();
         refresh_scoreboard();
         // Open the initial websocket connection.
         show_alert("Connecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>", "warning");

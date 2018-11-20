@@ -13,20 +13,29 @@
 
         #scoreboard {
             display: none;
-            position: absolute;
-            z-index: 10;
-            padding: 1em 0.6em;
-            width: 100vw;
-            height: 100vh;
-            top: 0;
-            left: 0;
+            padding-top: 25vh;
+        }
+
+        #scoreboard > .row > .col {
+            margin-left: 1em;
+        }
+
+        .score-entry {
+            margin-top: 0.3em;
 
             background: #3f48cc;
             color: white;
-            font-size: 500%;
-            text-transform: uppercase;
-            text-align: center;
+            font-size: 350%;
             text-shadow: 0.08em 0.08em black;
+        }
+
+        .score-points {
+            min-width: 3em;
+            text-align: right;
+        }
+
+        .score-name {
+            margin-left: 0.3em;
         }
 
         #status {
@@ -110,7 +119,7 @@
 
 
 {% block page_content %}
-    <div class="container">
+    <div id="gameboard" class="container">
         <div class="row">
             {% for category, questions in categories %}
                 <div class="col">
@@ -126,7 +135,24 @@
             {% endfor %}
         </div>
     </div>
-    <div id="scoreboard"></div>
+    <div id="scoreboard" class="container">
+        <div class="row">
+            <div class="col">
+                <div id="score-0" class="score-entry row"><span class="score-points"></span><span class="score-name"></span></div>
+                <div id="score-1" class="score-entry row"><span class="score-points"></span><span class="score-name"></span></div>
+                <div id="score-2" class="score-entry row"><span class="score-points"></span><span class="score-name"></span></div>
+                <div id="score-3" class="score-entry row"><span class="score-points"></span><span class="score-name"></span></div>
+                <div id="score-4" class="score-entry row"><span class="score-points"></span><span class="score-name"></span></div>
+            </div>
+            <div class="col">
+                <div id="score-5" class="score-entry row"><span class="score-points"></span><span class="score-name"></span></div>
+                <div id="score-6" class="score-entry row"><span class="score-points"></span><span class="score-name"></span></div>
+                <div id="score-7" class="score-entry row"><span class="score-points"></span><span class="score-name"></span></div>
+                <div id="score-8" class="score-entry row"><span class="score-points"></span><span class="score-name"></span></div>
+                <div id="score-9" class="score-entry row"><span class="score-points"></span><span class="score-name"></span></div>
+            </div>
+        </div>
+    </div>
     <div id="status">
         <div class="alert" role="alert"></div>
     </div>
@@ -153,8 +179,14 @@
         };
 
         var sounds = {
-            buzz: new Audio("{% static 'trebek/sounds/gobble.ogg' %}"),
-            time: new Audio("{% static 'trebek/sounds/shotgun.ogg' %}"),
+            buzz: {
+                path: "{% static 'trebek/sounds/gobble.ogg' %}",
+                volume: 0.5,
+            },
+            time: {
+                path: "{% static 'trebek/sounds/shotgun.ogg' %}",
+                volume: 0.25,
+            },
         };
 
         var player_data = {
@@ -170,13 +202,26 @@
         var game_started = false;
         var question_id = null;
 
-        function play_sound(sound) {
-            var snd = sounds[sound];
-            if (!snd) {
+        function preload_sounds() {
+            $.each(sounds, function (index, sound) {
+                if (sound.path) {
+                    sound.audio = new Audio(sound.path);
+                    sound.audio.volume = sound.volume;
+                }
+            });
+        }
+
+        function play_sound(sound_name) {
+            var sound = sounds[sound_name];
+            if (!sound || sound.disabled) {
                 return;
             }
-            snd.currentTime = 0;
-            snd.play();
+            var audio = sound.audio;
+            if (!audio) {
+                return;
+            }
+            audio.currentTime = 0;
+            audio.play();
         }
 
         function pop_question(id, text) {
@@ -186,12 +231,16 @@
             clear_question();
             question_id = id;
             var question_box = $("#question-" + question_id);
+            if (!question_box[0]) {
+                // Not a question we know about, just use the first box as an anchor.
+                question_box = $(".question:first");
+            }
             var popup = $("<div class='question-popup'></div>").appendTo($("body"));
+            var popup_text = $("<p></p>").appendTo(popup);
+            popup_text.text(text);
             popup.width(question_box.width());
             popup.height(question_box.outerHeight());
             popup.css(question_box.offset());
-            var popup_text = $("<p></p>").appendTo(popup);
-            popup_text.text(text);
             setTimeout(function() {
                 popup.addClass("question-popup-fs");
             }, 200);
@@ -221,34 +270,42 @@
             refresh_scoreboard();
         }
 
+        function trim_name(name, max_length=14) {
+            return name.slice(0, max_length - 1) + (name.length > max_length ? "..." : "");
+        }
+
         function refresh_scoreboard() {
-            var was_hidden = $("#scoreboard").is(":hidden");
-            $("#scoreboard").remove();
             var sorted_players = [];
             $.each(player_data, function (index, player) {
                 sorted_players.push(player);
             });
             sorted_players.sort(function (a, b) {
-                return b.score - a.score;
+                return (b.score || 0) - (a.score || 0);
             });
-            var scoreboard = $("<div id='scoreboard'></div>").appendTo($("body"));
-            var score_list = $("<ol></ol>").appendTo(scoreboard);
             $.each(sorted_players, function (index, player) {
-                var player_entry = $("<li></li>").appendTo(score_list);
-                player_entry.text(player.score + " - " + player.name)
+                if (index >= 10) {
+                    return;
+                }
+                $("#score-" + index + " .score-points").text(player.score || 0);
+                $("#score-" + index + " .score-name").text(trim_name(player.name));
             });
-            if (!was_hidden) {
-                scoreboard.show();
+            var empty = Math.max(0, 10 - sorted_players.length);
+            for (var index = 10 - empty; index < 10; index++)
+            {
+                $("#score-" + index + " .score-points").text("");
+                $("#score-" + index + " .score-name").text("");
             }
         }
 
         function toggle_scoreboard() {
             var scoreboard = $("#scoreboard");
             if (scoreboard.is(":hidden")) {
+                $("#gameboard").hide();
                 scoreboard.show();
             }
             else {
                 scoreboard.hide();
+                $("#gameboard").show();
             }
         }
 
@@ -335,6 +392,7 @@
             }
         }
 
+        preload_sounds();
         refresh_scoreboard();
         // Open the initial websocket connection.
         show_alert("Connecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>", "warning");

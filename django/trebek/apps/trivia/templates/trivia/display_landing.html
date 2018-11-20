@@ -8,9 +8,38 @@
 {% block page_styles %}
     <style>
         body {
+            background: black;
+            color: white;
+        }
+
+        h1 {
+            margin-top: 10vh;
+            font-size: 400%;
+            text-align: center;
+        }
+
+        h2 {
+            margin-top: 0.5em;
+            font-size: 400%;
+            text-align: center;
+        }
+
+        #player-list {
+            margin-top: 7vh;
+        }
+
+        #player-list > .col {
+            margin-left: 1em;
+        }
+
+        .player {
+            margin-top: 0.3em;
+            padding-left: 0.4em;
+
             background: #3f48cc;
             color: white;
-            font-size: 500%;
+            font-size: 250%;
+            text-shadow: 0.08em 0.08em black;
         }
 
         #status {
@@ -34,12 +63,33 @@
     <div class="container">
         <div class="row">
             <div class="col">
-                <h1>Get ready..</h1>
+                <h1>Jeopardy</h1>
             </div>
         </div>
         <div class="row">
             <div class="col">
-                <h1>{{ host_url }}/trivia</h1>
+                <h2>{{ host_url }}/trivia</h2>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                <h2>Game Key: {{ game.key }}</h2>
+            </div>
+        </div>
+        <div id="player-list" class="row">
+            <div class="col">
+                <div id="player-0" class="player row"></div>
+                <div id="player-1" class="player row"></div>
+                <div id="player-2" class="player row"></div>
+                <div id="player-3" class="player row"></div>
+                <div id="player-4" class="player row"></div>
+            </div>
+            <div class="col">
+                <div id="player-5" class="player row"></div>
+                <div id="player-6" class="player row"></div>
+                <div id="player-7" class="player row"></div>
+                <div id="player-8" class="player row"></div>
+                <div id="player-9" class="player row"></div>
             </div>
         </div>
     </div>
@@ -69,15 +119,53 @@
         };
 
         var sounds = {
-            buzz: new Audio("{% static 'trebek/sounds/buzz.ogg' %}"),
+            connect: {
+                path: "{% static 'trebek/sounds/buzz.ogg' %}",
+                volume: 1,
+            },
         };
 
         var ws = null;
+        var player_data = {};
+        var player_count = 0;
 
-        function play_sound(sound) {
-            var snd = sounds[sound];
-            snd.currentTime = 0;
-            snd.play();
+        function preload_sounds() {
+            $.each(sounds, function (index, sound) {
+                if (sound.path) {
+                    sound.audio = new Audio(sound.path);
+                    sound.audio.volume = sound.volume;
+                }
+            });
+        }
+
+        function play_sound(sound_name) {
+            var sound = sounds[sound_name];
+            if (!sound || sound.disabled) {
+                return;
+            }
+            var audio = sound.audio;
+            if (!audio) {
+                return;
+            }
+            audio.currentTime = 0;
+            audio.play();
+        }
+
+        function trim_name(name, max_length=14) {
+            return name.slice(0, max_length - 1) + (name.length > max_length ? "..." : "");
+        }
+
+        function add_player(id, name) {
+            play_sound("connect");
+            if (player_data[id]) {
+                return;
+            }
+            if (player_count >= 10) {
+                return;
+            }
+            $("#player-" + player_count).text(trim_name(name));
+            player_count++;
+            player_data[id] = {name: name};
         }
 
         function show_alert(html, alert_class="danger") {
@@ -100,6 +188,7 @@
                     console.error("Received error from middleware:", msg.error);
                     return;
                 case msg_types.PLAYER_CONNECTED:
+                    add_player(msg.player_id, msg.player_name);
                     break;
                 case msg_types.GAME_START:
                 case msg_types.GAME_RESET:
@@ -148,6 +237,7 @@
             }
         }
 
+        preload_sounds();
         // Open the initial websocket connection.
         show_alert("Connecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>", "warning");
         check_connection();

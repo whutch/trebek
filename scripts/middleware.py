@@ -318,10 +318,10 @@ class Player(Client):
         # If there's an admin in our game already, let the player know.
         if player.game.admins:
             await player.send_message(MessageTypes.ADMIN_CONNECTED)
-        # Pass the player data on to the admins.
+        # Pass the player data on to the admins and displays.
         score = models.Player.objects.get(id=player.id).score
-        for admin in player.game.admins:
-            await admin.send_message(MessageTypes.PLAYER_CONNECTED, {
+        for client in itertools.chain(player.game.admins, player.game.displays):
+            await client.send_message(MessageTypes.PLAYER_CONNECTED, {
                 "player_id": player.id,
                 "player_name": player.name,
                 "score": score,

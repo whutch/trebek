@@ -268,11 +268,8 @@
             $("#pop-test").attr("disabled", false);
         }
 
-        function reset_game(no_message=false) {
+        function reset_game() {
             game_started = false;
-            if (!no_message) {
-                send_message(msg_types.GAME_RESET);
-            }
             $("#start").attr("disabled", false);
             $("#reset").attr("disabled", true);
             $("#scoreboard").attr("disabled", true);
@@ -299,7 +296,7 @@
                     start_game(true);
                     break;
                 case msg_types.GAME_RESET:
-                    reset_game(true);
+                    reset_game();
                     break;
                 case msg_types.POP_QUESTION:
                     pop_question(msg.question_id, true);
@@ -388,7 +385,7 @@
         });
 
         $("#reset").on("click", function () {
-            reset_game();
+            send_message(msg_types.GAME_RESET);
         });
 
         $("#scoreboard").on("click", function () {

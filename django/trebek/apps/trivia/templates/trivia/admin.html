@@ -222,6 +222,7 @@
             }
             if (answered) {
                 disable_question(question_id);
+                question_data[question_id].answered = true;
             }
             question = null;
             question_id = null;
@@ -232,6 +233,13 @@
                 .addClass("btn-secondary")
                 .removeClass("btn-primary")
                 .attr("disabled", true);
+        }
+
+        function enable_question(id) {
+            $("#question-" + id)
+                .addClass("btn-primary")
+                .removeClass("btn-secondary")
+                .attr("disabled", false);
         }
 
         function add_to_score(player_id, amount)
@@ -272,6 +280,11 @@
             $("#scoreboard").attr("disabled", true);
             $("#pop-test").attr("disabled", true);
             clear_question(false, true);
+            $.each(question_data, function (id, data) {
+                if (data.answered) {
+                    enable_question(id);
+                }
+            });
         }
 
         function parse_message(msg) {

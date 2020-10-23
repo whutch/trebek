@@ -199,8 +199,6 @@ class Admin(Client):
             self.game.started = True
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
-                if client is self:
-                    continue
                 await client.send_message(MessageTypes.GAME_START)
         elif msg_type == MessageTypes.GAME_RESET:
             log.info(f"Reseting game {self.game.key}.")

@@ -217,8 +217,6 @@ class Admin(Client):
                 player.save()
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
-                if client is self:
-                    continue
                 await client.send_message(MessageTypes.GAME_RESET)
         elif msg_type == MessageTypes.POP_QUESTION:
             self.game.popped_question_real_id = msg_data["question_id"]

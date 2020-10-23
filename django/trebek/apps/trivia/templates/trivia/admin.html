@@ -257,10 +257,7 @@
             $("#status").hide();
         }
 
-        function start_game(no_message=false) {
-            if (!no_message) {
-                send_message(msg_types.GAME_START);
-            }
+        function start_game() {
             game_started = true;
             $("#start").attr("disabled", true);
             $("#reset").attr("disabled", false);
@@ -293,7 +290,7 @@
                     }
                     break;
                 case msg_types.GAME_START:
-                    start_game(true);
+                    start_game();
                     break;
                 case msg_types.GAME_RESET:
                     reset_game();
@@ -381,7 +378,7 @@
         });
 
         $("#start").on("click", function () {
-            start_game();
+            send_message(msg_types.GAME_START);
         });
 
         $("#reset").on("click", function () {

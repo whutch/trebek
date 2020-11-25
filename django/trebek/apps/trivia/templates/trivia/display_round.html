@@ -335,6 +335,8 @@
                 case msg_types.CHANGE_ROUND:
                     location.reload();
                     break;
+                case msg_types.PLAYER_CONNECTED:
+                    break;
                 case msg_types.POP_QUESTION:
                     pop_question(msg.question_id, msg.question_text);
                     break;

@@ -99,45 +99,15 @@ def game_home(request, game_key):
 
 def admin(request, game_key):
     game = get_object_or_404(Game, key=game_key)
-    categories = []
-    for category in game.categories.all():
-        questions = []
-        for question in category.questions.all():
-            question_data = {
-                "id": question.id,
-                "text": question.text,
-                "answer": question.answer,
-                "point_value": question.point_value,
-            }
-            try:
-                state = question.questionstate_set.get(game=game)
-            except QuestionState.DoesNotExist:
-                state = None
-            question_data["answered"] = state.answered if state else False
-            questions.append(question_data)
-        categories.append([category, questions])
-    players = Player.objects.filter(game=game)
-    context = {
-        "game": game,
-        "categories": categories,
-        "players": players,
-        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0])
-    }
-    return render(request, "trivia/admin.html", context)
-
-
-def display(request, game_key):
-    game = get_object_or_404(Game, key=game_key)
     context = {
         "game": game,
         "players": Player.objects.filter(game=game),
         "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0])
     }
-    if not game.started:
-        context["host_url"] = request.META["HTTP_HOST"]
-        return render(request, "trivia/display_landing.html", context)
+    if game.current_round == 0:
+        return render(request, "trivia/admin_landing.html", context)
     categories = []
-    for category in game.categories.all():
+    for category in game.categories.filter(round=game.current_round):
         questions = []
         for question in category.questions.all():
             question_data = {
@@ -154,7 +124,38 @@ def display(request, game_key):
             questions.append(question_data)
         categories.append([category, questions])
     context["categories"] = categories
-    return render(request, "trivia/display.html", context)
+    return render(request, "trivia/admin_round.html", context)
+
+
+def display(request, game_key):
+    game = get_object_or_404(Game, key=game_key)
+    context = {
+        "game": game,
+        "players": Player.objects.filter(game=game),
+        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0])
+    }
+    if game.current_round == 0:
+        context["host_url"] = request.META["HTTP_HOST"]
+        return render(request, "trivia/display_landing.html", context)
+    categories = []
+    for category in game.categories.filter(round=game.current_round):
+        questions = []
+        for question in category.questions.all():
+            question_data = {
+                "id": question.id,
+                "text": question.text,
+                "answer": question.answer,
+                "point_value": question.point_value,
+            }
+            try:
+                state = question.questionstate_set.get(game=game)
+            except QuestionState.DoesNotExist:
+                state = None
+            question_data["answered"] = state.answered if state else False
+            questions.append(question_data)
+        categories.append([category, questions])
+    context["categories"] = categories
+    return render(request, "trivia/display_round.html", context)
 
 
 def buzzer(request, game_key):
@@ -171,4 +172,6 @@ def buzzer(request, game_key):
         "player": player,
         "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0])
     }
-    return render(request, "trivia/buzzer.html", context)
+    if game.current_round == 0:
+        return render(request, "trivia/buzzer_landing.html", context)
+    return render(request, "trivia/buzzer_round.html", context)

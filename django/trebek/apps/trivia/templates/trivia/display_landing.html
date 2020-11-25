@@ -104,18 +104,18 @@
 
         var msg_types = {
             ERROR: 0,
-            ADMIN_CONNECTED: 1,
-            DISPLAY_CONNECTED: 2,
-            PLAYER_CONNECTED: 3,
-            GAME_START: 4,
-            GAME_RESET: 5,
-            POP_QUESTION: 6,
-            CLEAR_QUESTION: 7,
-            PLAYER_BUZZED: 8,
-            CLEAR_BUZZ: 9,
-            UPDATE_SCORE: 10,
-            PLAY_SOUND: 11,
-            TOGGLE_SCOREBOARD: 12,
+            ADMIN_CONNECTED: 10,
+            DISPLAY_CONNECTED: 11,
+            PLAYER_CONNECTED: 12,
+            GAME_RESET: 21,
+            CHANGE_ROUND: 22,
+            POP_QUESTION: 30,
+            CLEAR_QUESTION: 31,
+            PLAYER_BUZZED: 40,
+            CLEAR_BUZZ: 41,
+            UPDATE_SCORE: 50,
+            PLAY_SOUND: 60,
+            TOGGLE_SCOREBOARD: 70,
         };
 
         var sounds = {
@@ -190,8 +190,8 @@
                 case msg_types.PLAYER_CONNECTED:
                     add_player(msg.player_id, msg.player_name);
                     break;
-                case msg_types.GAME_START:
                 case msg_types.GAME_RESET:
+                case msg_types.CHANGE_ROUND:
                     location.reload();
                     break;
                 case msg_types.PLAY_SOUND:

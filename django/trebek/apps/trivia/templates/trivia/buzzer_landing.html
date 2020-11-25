@@ -122,19 +122,6 @@
                     button_contents = "Waiting for start..";
                     button_class = "btn-warning";
                     break;
-                case button_states.WAITING_QUESTION:
-                    button_contents = "Waiting for question..";
-                    button_class = "btn-secondary";
-                    break;
-                case button_states.WAITING_ANSWER:
-                    button_contents = "Waiting for answer..";
-                    button_class = "btn-secondary";
-                    break;
-                case button_states.READY:
-                    button_contents = "BUZZ!";
-                    button_class = "btn-success";
-                    disabled = false;
-                    break;
                 default:
                     button_contents = "Error!";
                     console.error("Unknown button state", new_state);
@@ -154,26 +141,9 @@
             else if (!admin_connected) {
                 update_button(button_states.WAITING_ADMIN);
             }
-            else if (!question_id) {
-                update_button(button_states.WAITING_QUESTION);
-            }
-            else if (player_buzzed) {
-                update_button(button_states.WAITING_ANSWER);
-            }
             else {
-                update_button(button_states.READY);
+                update_button(button_states.WAITING_START);
             }
-        }
-
-        function show_question(question_text) {
-            $("body").css("background", "#3f48cc");
-            $("#question p").html(question_text);
-            $("#question").show();
-        }
-
-        function hide_question() {
-            $("body").css("background", "black");
-            $("#question").hide();
         }
 
         function parse_message(msg) {
@@ -190,27 +160,10 @@
                     location.reload();
                     break;
                 case msg_types.POP_QUESTION:
-                    question_id = msg.question_id;
-                    player_buzzed = false;
-                    show_question(msg.question_text);
-                    check_ready_state();
-                    break;
                 case msg_types.CLEAR_QUESTION:
-                    question_id = null;
-                    player_buzzed = false;
-                    hide_question();
-                    check_ready_state();
-                    break;
                 case msg_types.PLAYER_BUZZED:
-                    player_buzzed = true;
-                    check_ready_state();
-                    break;
                 case msg_types.CLEAR_BUZZ:
-                    player_buzzed = false;
-                    check_ready_state();
-                    break;
                 case msg_types.UPDATE_SCORE:
-                    break;
                 case msg_types.PLAY_SOUND:
                     break;
                 default:

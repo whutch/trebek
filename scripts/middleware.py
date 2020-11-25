@@ -32,18 +32,18 @@ HOST_PORT = 8765
 
 class MessageTypes:
     ERROR = 0
-    ADMIN_CONNECTED = 1
-    DISPLAY_CONNECTED = 2
-    PLAYER_CONNECTED = 3
-    GAME_START = 4
-    GAME_RESET = 5
-    POP_QUESTION = 6
-    CLEAR_QUESTION = 7
-    PLAYER_BUZZED = 8
-    CLEAR_BUZZ = 9
-    UPDATE_SCORE = 10
-    PLAY_SOUND = 11
-    TOGGLE_SCOREBOARD = 12
+    ADMIN_CONNECTED = 10
+    DISPLAY_CONNECTED = 11
+    PLAYER_CONNECTED = 12
+    GAME_RESET = 21
+    CHANGE_ROUND = 22
+    POP_QUESTION = 30
+    CLEAR_QUESTION = 31
+    PLAYER_BUZZED = 40
+    CLEAR_BUZZ = 41
+    UPDATE_SCORE = 50
+    PLAY_SOUND = 60
+    TOGGLE_SCOREBOARD = 70
 
 
 logging.basicConfig(level=logging.INFO)
@@ -98,12 +98,12 @@ class Game:
         GAMES[game_key] = self
 
     @property
-    def started(self):
-        return self._game.started
+    def round(self):
+        return self._game.current_round
 
-    @started.setter
-    def started(self, value):
-        self._game.started = value
+    @round.setter
+    def round(self, value):
+        self._game.current_round = value
         self._game.save()
 
     def register_client(self, client):
@@ -172,9 +172,6 @@ class Admin(Client):
         # Forward admin connections to all players.
         for player in admin.game.players:
             await player.send_message(MessageTypes.ADMIN_CONNECTED)
-        # If the game has started, let the admin know.
-        if admin.game.started:
-            await admin.send_message(MessageTypes.GAME_START)
         # If there is a question popped, let the admin know.
         if admin.game.popped_question_real_id:
             await admin.send_message(MessageTypes.POP_QUESTION, {
@@ -192,22 +189,14 @@ class Admin(Client):
     async def handle_message(self, msg_type, msg_data):
         if not msg_type:
             return
-        elif msg_type == MessageTypes.GAME_START:
-            if self.game.started:
-                return
-            log.info(f"Starting game {self.game.key}.")
-            self.game.started = True
-            # Pass it on to everything.
-            for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
-                await client.send_message(MessageTypes.GAME_START)
         elif msg_type == MessageTypes.GAME_RESET:
             log.info(f"Reseting game {self.game.key}.")
             self.game.popped_question_real_id = None
             self.game.popped_question_uuid = None
             self.game.popped_question_text = None
             self.game.buzzing_player = None
-            self.game.started = False
-            # Delete all game states.
+            self.game.round = 0
+            # Delete all question states for this game.
             models.QuestionState.objects.filter(game__key=self.game.key).delete()
             # Reset all scores.
             for player in models.Player.objects.filter(game__key=self.game.key):
@@ -216,6 +205,18 @@ class Admin(Client):
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.GAME_RESET)
+        elif msg_type == MessageTypes.CHANGE_ROUND:
+            if self.game.round == msg_data["round"] or msg_data["round"] < 1:
+                return
+            log.info(f"Changing to round {msg_data['round']} in game {self.game.key}.")
+            self.game.popped_question_real_id = None
+            self.game.popped_question_uuid = None
+            self.game.popped_question_text = None
+            self.game.buzzed_player = None
+            self.game.round = msg_data["round"]
+            # Pass it on to everything.
+            for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
+                await client.send_message(MessageTypes.CHANGE_ROUND, msg_data)
         elif msg_type == MessageTypes.POP_QUESTION:
             self.game.popped_question_real_id = msg_data["question_id"]
             self.game.popped_question_text = msg_data["question_text"]
@@ -241,7 +242,7 @@ class Admin(Client):
             # Pass it on to the displays.
             for display in self.game.displays:
                 await display.send_message(MessageTypes.CLEAR_QUESTION, msg_data)
-            # Strip out the question_id before passing it on to the player.
+            # Strip out the question_id before passing it on to the players.
             del msg_data["question_id"]
             for player in self.game.players:
                 await player.send_message(MessageTypes.CLEAR_QUESTION, msg_data)
@@ -279,9 +280,6 @@ class Display(Client):
     @classmethod
     async def new(cls, *args, **kwargs):
         display = cls(*args, **kwargs)
-        # If the game has started, let the display know.
-        if display.game.started:
-            await display.send_message(MessageTypes.GAME_START)
         # If there is a question popped, let the display know.
         if display.game.popped_question_real_id:
             await display.send_message(MessageTypes.POP_QUESTION, {
@@ -322,9 +320,6 @@ class Player(Client):
                 "player_name": player.name,
                 "score": score,
             })
-        # If the game has started, let the player know.
-        if player.game.started:
-            await player.send_message(MessageTypes.GAME_START)
         # If there is a question popped, let the player know.
         if player.game.popped_question_real_id:
             await player.send_message(MessageTypes.POP_QUESTION, {

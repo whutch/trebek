@@ -49,16 +49,19 @@
         </div>
         <div class="row">
             <div class="col">
-                <button type="button" class="btn btn-success" id="start">Start</button>
+                <button type="button" class="btn btn-danger" id="reset">Reset</button>
             </div>
             <div class="col">
-                <button type="button" class="btn btn-danger" id="reset" disabled>Reset</button>
+                <button type="button" class="btn btn-info" id="scoreboard">Scoreboard</button>
             </div>
             <div class="col">
-                <button type="button" class="btn btn-info" id="scoreboard" disabled>Scoreboard</button>
+                <button type="button" class="btn btn-secondary" id="pop-test">Pop Test</button>
             </div>
             <div class="col">
-                <button type="button" class="btn btn-secondary" id="pop-test" disabled>Pop Test</button>
+                <button type="button" class="btn btn-info" id="previous-round">Previous Round</button>
+            </div>
+            <div class="col">
+                <button type="button" class="btn btn-info" id="next-round">Next Round</button>
             </div>
         </div>
         <hr/>
@@ -123,18 +126,18 @@
 
         var msg_types = {
             ERROR: 0,
-            ADMIN_CONNECTED: 1,
-            DISPLAY_CONNECTED: 2,
-            PLAYER_CONNECTED: 3,
-            GAME_START: 4,
-            GAME_RESET: 5,
-            POP_QUESTION: 6,
-            CLEAR_QUESTION: 7,
-            PLAYER_BUZZED: 8,
-            CLEAR_BUZZ: 9,
-            UPDATE_SCORE: 10,
-            PLAY_SOUND: 11,
-            TOGGLE_SCOREBOARD: 12,
+            ADMIN_CONNECTED: 10,
+            DISPLAY_CONNECTED: 11,
+            PLAYER_CONNECTED: 12,
+            GAME_RESET: 21,
+            CHANGE_ROUND: 22,
+            POP_QUESTION: 30,
+            CLEAR_QUESTION: 31,
+            PLAYER_BUZZED: 40,
+            CLEAR_BUZZ: 41,
+            UPDATE_SCORE: 50,
+            PLAY_SOUND: 60,
+            TOGGLE_SCOREBOARD: 70,
         };
 
         var question_data = {
@@ -166,7 +169,6 @@
         };
 
         var ws = null;
-        var game_started = false;
         var question_id = null;
         var question = null;
         var buzzing_player = null;
@@ -265,28 +267,6 @@
             $("#status").hide();
         }
 
-        function start_game() {
-            game_started = true;
-            $("#start").attr("disabled", true);
-            $("#reset").attr("disabled", false);
-            $("#scoreboard").attr("disabled", false);
-            $("#pop-test").attr("disabled", false);
-        }
-
-        function reset_game() {
-            game_started = false;
-            $("#start").attr("disabled", false);
-            $("#reset").attr("disabled", true);
-            $("#scoreboard").attr("disabled", true);
-            $("#pop-test").attr("disabled", true);
-            clear_question(false, true);
-            $.each(question_data, function (id, data) {
-                if (data.answered) {
-                    enable_question(id);
-                }
-            });
-        }
-
         function parse_message(msg) {
             switch (msg.type) {
                 case msg_types.ERROR:
@@ -302,11 +282,9 @@
                         };
                     }
                     break;
-                case msg_types.GAME_START:
-                    start_game();
-                    break;
                 case msg_types.GAME_RESET:
-                    reset_game();
+                case msg_types.CHANGE_ROUND:
+                    location.reload();
                     break;
                 case msg_types.POP_QUESTION:
                     pop_question(msg.question_id, true);
@@ -337,10 +315,6 @@
             ws.onopen = function (event) {
                 send_message(msg_types.ADMIN_CONNECTED);
                 clear_alert();
-                if (game_started) {
-                    // Make sure the middleware is up to date on the game state.
-                    send_message(msg_types.GAME_START);
-                }
             };
             ws.onmessage = function (event) {
                 var data = JSON.parse(event.data);
@@ -360,9 +334,6 @@
         }
 
         $(".question").on("click", function () {
-            if (!game_started) {
-                return;
-            }
             pop_question($(this).attr("id").split("-")[1]);
         });
 
@@ -393,10 +364,6 @@
             clear_question(true);
         });
 
-        $("#start").on("click", function () {
-            send_message(msg_types.GAME_START);
-        });
-
         $("#reset").on("click", function () {
             send_message(msg_types.GAME_RESET);
         });
@@ -407,6 +374,18 @@
 
         $("#pop-test").on("click", function () {
             pop_question("pop_test");
+        });
+
+        $("#previous-round").on("click", function () {
+            send_message(msg_types.CHANGE_ROUND, {
+                round: {{ game.current_round }} - 1,
+            });
+        });
+
+        $("#next-round").on("click", function () {
+            send_message(msg_types.CHANGE_ROUND, {
+                round: {{ game.current_round }} + 1,
+            });
         });
 
         // Disable all the answered questions.

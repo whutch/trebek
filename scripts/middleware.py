@@ -13,6 +13,7 @@ import os
 from os.path import abspath, dirname, join
 import ssl
 import sys
+import time
 import uuid
 
 import django
@@ -33,6 +34,7 @@ HOST_PORT = 8765
 
 class MessageTypes:
     ERROR = 0
+    PING = 1
     ADMIN_CONNECTED = 10
     DISPLAY_CONNECTED = 11
     PLAYER_CONNECTED = 12
@@ -221,6 +223,11 @@ class Admin(Client):
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.CHANGE_ROUND, msg_data)
         elif msg_type == MessageTypes.POP_QUESTION:
+            # Update pings first.
+            for player in self.game.players:
+                await player.send_message(MessageTypes.PING, {
+                    "start_time": time.time(),
+                })
             self.game.popped_question_real_id = msg_data["question_id"]
             self.game.popped_question_text = msg_data["question_text"]
             self.game.buzzes.clear()
@@ -311,6 +318,7 @@ class Player(Client):
     def __init__(self, websocket, game_key, player_id, player_name):
         self.id = player_id
         self.name = player_name
+        self.ping = -1
         super().__init__(websocket, game_key)
 
     @classmethod
@@ -338,6 +346,9 @@ class Player(Client):
     async def handle_message(self, msg_type, msg_data):
         if not msg_type:
             return
+        elif msg_type == MessageTypes.PING:
+            delta = time.time() - msg_data["start_time"]
+            self.ping = delta
         elif msg_type == MessageTypes.PLAYER_BUZZED:
             question_id = msg_data["question_id"]
             if question_id != self.game.popped_question_uuid:

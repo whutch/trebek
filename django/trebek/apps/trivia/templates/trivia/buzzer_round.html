@@ -68,6 +68,7 @@
 
         var msg_types = {
             ERROR: 0,
+            PING: 1,
             ADMIN_CONNECTED: 10,
             DISPLAY_CONNECTED: 11,
             PLAYER_CONNECTED: 12,
@@ -177,6 +178,9 @@
             switch (msg.type) {
                 case msg_types.ERROR:
                     console.error("Received error from middleware:", msg.error);
+                    return;
+                case msg_types.PING:
+                    send_message(msg_types.PING, msg);
                     return;
                 case msg_types.ADMIN_CONNECTED:
                     admin_connected = true;

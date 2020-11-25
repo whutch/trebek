@@ -164,18 +164,20 @@
 
         var msg_types = {
             ERROR: 0,
-            ADMIN_CONNECTED: 1,
-            DISPLAY_CONNECTED: 2,
-            PLAYER_CONNECTED: 3,
-            GAME_START: 4,
-            GAME_RESET: 5,
-            POP_QUESTION: 6,
-            CLEAR_QUESTION: 7,
-            PLAYER_BUZZED: 8,
-            CLEAR_BUZZ: 9,
-            UPDATE_SCORE: 10,
-            PLAY_SOUND: 11,
-            TOGGLE_SCOREBOARD: 12,
+            PING: 1,
+            ADMIN_CONNECTED: 10,
+            DISPLAY_CONNECTED: 11,
+            PLAYER_CONNECTED: 12,
+            GAME_RESET: 21,
+            CHANGE_ROUND: 22,
+            POP_QUESTION: 30,
+            CLEAR_QUESTION: 31,
+            PLAYER_BUZZED: 40,
+            CLEAR_BUZZ: 41,
+            CLEAR_ALL_BUZZES: 42,
+            UPDATE_SCORE: 50,
+            PLAY_SOUND: 60,
+            TOGGLE_SCOREBOARD: 70,
         };
 
         var sounds = {
@@ -236,8 +238,10 @@
                 question_box = $(".question:first");
             }
             var popup = $("<div class='question-popup'></div>").appendTo($("body"));
-            var popup_text = $("<p></p>").appendTo(popup);
-            popup_text.text(text);
+            // TODO: DON'T PUT RAW HTML IN HERE, USE A MARKUP RENDERER TO ALLOW TAGS SAFELY
+            var popup_text = $("<p> "+ text + "</p>").appendTo(popup);
+            //var popup_text = $("<p></p>").appendTo(popup);
+            //popup_text.text(text);
             popup.width(question_box.width());
             popup.height(question_box.outerHeight());
             popup.css(question_box.offset());
@@ -328,12 +332,11 @@
                 case msg_types.ERROR:
                     console.error("Received error from middleware:", msg.error);
                     return;
-                case msg_types.GAME_START:
-                    // We wouldn't be on this page if the game wasn't started, just ignore it.
-                    break;
                 case msg_types.GAME_RESET:
-                    // We don't track much state, so just reload the page.
+                case msg_types.CHANGE_ROUND:
                     location.reload();
+                    break;
+                case msg_types.PLAYER_CONNECTED:
                     break;
                 case msg_types.POP_QUESTION:
                     pop_question(msg.question_id, msg.question_text);

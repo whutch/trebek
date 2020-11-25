@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% load static %}
+
+
+{% block page_title %}Buzzer{% endblock %}
+
+
+{% block page_styles %}
+    <style>
+        body {
+            background: black;
+            color: #fcfbf6;
+        }
+
+        #buttons {
+            margin-top: 5vh;
+        }
+
+        #buzzer {
+            width: 100%;
+            font-size: 200%;
+        }
+
+        #question {
+            display: none;
+        }
+
+        #question p {
+            margin-top: 5vh;
+
+            text-transform: uppercase;
+            text-align: center;
+            text-shadow: 0.08em 0.08em black;
+            font-size: 200%;
+        }
+
+        .btn-success, .btn-danger, .btn-secondary {
+            text-shadow: 0.08em 0.08em black;
+        }
+
+        .btn-success, .btn-success:hover, .btn-success:focus, .btn-success:active {
+            background-color: orange !important;
+            border-color: orange !important;
+        }
+
+        img.reconnecting {
+            height: 1em;
+        }
+    </style>
+{% endblock %}
+
+
+{% block page_content %}
+    <div class="container">
+        <div class="row" id="buttons">
+            <div class="col">
+                <button type="button" id="buzzer" class="btn btn-danger btn-lg" id="buzzer" disabled="true">
+                    Connecting.. <img class="reconnecting" src="{% static 'trebek/reconnecting.svg' %}"/>
+                </button>
+            </div>
+        </div>
+        <div class="row" id="question">
+            <div class="col">
+                <p></p>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+
+{% block page_scripts %}
+    <script type="text/javascript">
+
+        var msg_types = {
+            ERROR: 0,
+            PING: 1,
+            ADMIN_CONNECTED: 10,
+            DISPLAY_CONNECTED: 11,
+            PLAYER_CONNECTED: 12,
+            GAME_RESET: 21,
+            CHANGE_ROUND: 22,
+            POP_QUESTION: 30,
+            CLEAR_QUESTION: 31,
+            PLAYER_BUZZED: 40,
+            CLEAR_BUZZ: 41,
+            CLEAR_ALL_BUZZES: 42,
+            UPDATE_SCORE: 50,
+            PLAY_SOUND: 60,
+            TOGGLE_SCOREBOARD: 70,
+        };
+
+        var button_states = {
+            CONNECTING: 1,
+            RECONNECTING: 2,
+            WAITING_ADMIN: 3,
+            WAITING_START: 4,
+            WAITING_QUESTION: 5,
+            WAITING_ANSWER: 6,
+            READY: 7,
+        };
+
+        var ws = null;
+        var button_state = button_states.CONNECTING;
+        var admin_connected = false;
+        var question_id = null;
+
+        function update_button(new_state) {
+            if (button_state == new_state) {
+                // We're already there, don't bother with the rest of this.
+                return;
+            }
+            button_state = new_state;
+            var disabled = true;
+            var button_contents = "";
+            var button_class = "btn-danger";
+            switch (button_state) {
+                case button_states.CONNECTING:
+                    button_contents = "Connecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>";
+                    break;
+                case button_states.RECONNECTING:
+                    button_contents = "Reconnecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>";
+                    break;
+                case button_states.WAITING_ADMIN:
+                    button_contents = "Waiting for admin..";
+                    button_class = "btn-warning";
+                    break;
+                case button_states.WAITING_START:
+                    button_contents = "Waiting for start..";
+                    button_class = "btn-warning";
+                    break;
+                case button_states.WAITING_QUESTION:
+                    button_contents = "Waiting for question..";
+                    button_class = "btn-secondary";
+                    break;
+                case button_states.WAITING_ANSWER:
+                    button_contents = "Waiting for answer..";
+                    button_class = "btn-secondary";
+                    break;
+                case button_states.READY:
+                    button_contents = "BUZZ!";
+                    button_class = "btn-success";
+                    disabled = false;
+                    break;
+                default:
+                    button_contents = "Error!";
+                    console.error("Unknown button state", new_state);
+                    return;
+            }
+            $("#buzzer")
+                .html(button_contents)
+                .removeClass("btn-primary btn-secondary btn-warning btn-danger btn-success")
+                .addClass(button_class)
+                .attr("disabled", disabled);
+        }
+
+        function check_ready_state() {
+            if (!ws || ws.readyState != WebSocket.OPEN) {
+                update_button(button_states.RECONNECTING);
+            }
+            else if (!admin_connected) {
+                update_button(button_states.WAITING_ADMIN);
+            }
+            else if (!question_id) {
+                update_button(button_states.WAITING_QUESTION);
+            }
+            else {
+                update_button(button_states.READY);
+            }
+        }
+
+        function show_question(question_text) {
+            $("body").css("background", "#6d2d00");
+            $("#question p").html(question_text);
+            $("#question").show();
+        }
+
+        function hide_question() {
+            $("body").css("background", "black");
+            $("#question").hide();
+        }
+
+        function parse_message(msg) {
+            switch (msg.type) {
+                case msg_types.ERROR:
+                    console.error("Received error from middleware:", msg.error);
+                    return;
+                case msg_types.PING:
+                    send_message(msg_types.PING, msg);
+                    return;
+                case msg_types.ADMIN_CONNECTED:
+                    admin_connected = true;
+                    check_ready_state();
+                    break;
+                case msg_types.GAME_RESET:
+                case msg_types.CHANGE_ROUND:
+                    location.reload();
+                    break;
+                case msg_types.POP_QUESTION:
+                    question_id = msg.question_id;
+                    show_question(msg.question_text);
+                    check_ready_state();
+                    break;
+                case msg_types.CLEAR_QUESTION:
+                    question_id = null;
+                    hide_question();
+                    check_ready_state();
+                    break;
+                case msg_types.PLAYER_BUZZED:
+                    break;
+                case msg_types.CLEAR_BUZZ:
+                    break;
+                case msg_types.UPDATE_SCORE:
+                    break;
+                case msg_types.PLAY_SOUND:
+                    break;
+                default:
+                    console.error("Unhandled msg.type:", msg.type);
+                    return;
+            }
+        }
+
+        function send_message(type, data = {}) {
+            Object.assign(data, {
+                type: type,
+                // These sorts of values shouldn't be trusted from the client, but this
+                //  is just a dumb trivia app and I'm lazy.
+                game_key: "{{ game.key }}",
+                player_id: "{{ player.id }}",
+                player_name: "{{ player.name }}",
+            });
+            if (!ws || ws.readyState != WebSocket.OPEN) {
+                console.error("Could not send msg, websocket closed:", data);
+                return;
+            }
+            ws.send(JSON.stringify(data));
+        }
+
+        function connect(uri) {
+            ws = new WebSocket(uri);
+            ws.onopen = function (event) {
+                send_message(msg_types.PLAYER_CONNECTED);
+                check_ready_state();
+            };
+            ws.onmessage = function (event) {
+                var data = JSON.parse(event.data);
+                parse_message(data);
+            };
+            ws.onclose = function () {
+                check_ready_state();
+            }
+        }
+
+        function check_connection() {
+            if (!ws || ws.readyState == WebSocket.CLOSED) {
+                connect("{{ ws_uri }}");
+            }
+        }
+
+        $("#buzzer").on("click", function () {
+            send_message(msg_types.PLAYER_BUZZED, {
+                question_id: question_id,
+            });
+        });
+
+        // Open the initial websocket connection.
+        check_connection();
+        // Set up a timer to keep reconnecting on disconnect.
+        setInterval(check_connection, 5000);
+    </script>
+{% endblock %}

@@ -29,6 +29,10 @@
             font-weight: bold;
         }
 
+        #buzzed span {
+            margin-left: 1em;
+        }
+
         img.reconnecting {
             height: 1em;
         }
@@ -49,16 +53,19 @@
         </div>
         <div class="row">
             <div class="col">
-                <button type="button" class="btn btn-success" id="start">Start</button>
+                <button type="button" class="btn btn-danger" id="reset">Reset</button>
             </div>
             <div class="col">
-                <button type="button" class="btn btn-danger" id="reset" disabled>Reset</button>
+                <button type="button" class="btn btn-info" id="scoreboard">Scoreboard</button>
             </div>
             <div class="col">
-                <button type="button" class="btn btn-info" id="scoreboard" disabled>Scoreboard</button>
+                <button type="button" class="btn btn-secondary" id="pop-test">Pop Test</button>
             </div>
             <div class="col">
-                <button type="button" class="btn btn-secondary" id="pop-test" disabled>Pop Test</button>
+                <button type="button" class="btn btn-info" id="previous-round">Previous Round</button>
+            </div>
+            <div class="col">
+                <button type="button" class="btn btn-info" id="next-round">Next Round</button>
             </div>
         </div>
         <hr/>
@@ -89,7 +96,10 @@
                         <button type="button" class="btn btn-danger needs-buzz" id="wrong" disabled>Wrong</button>
                     </div>
                     <div class="col">
-                        <button type="button" class="btn btn-secondary needs-buzz" id="clear-buzz" disabled>Clear</button>
+                        <button type="button" class="btn btn-secondary needs-buzz" id="clear-buzz" disabled>Clear One</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-dark needs-buzz" id="clear-all-buzzes" disabled>Clear All</button>
                     </div>
                 </div>
                 <div class="row">
@@ -123,18 +133,20 @@
 
         var msg_types = {
             ERROR: 0,
-            ADMIN_CONNECTED: 1,
-            DISPLAY_CONNECTED: 2,
-            PLAYER_CONNECTED: 3,
-            GAME_START: 4,
-            GAME_RESET: 5,
-            POP_QUESTION: 6,
-            CLEAR_QUESTION: 7,
-            PLAYER_BUZZED: 8,
-            CLEAR_BUZZ: 9,
-            UPDATE_SCORE: 10,
-            PLAY_SOUND: 11,
-            TOGGLE_SCOREBOARD: 12,
+            PING: 1,
+            ADMIN_CONNECTED: 10,
+            DISPLAY_CONNECTED: 11,
+            PLAYER_CONNECTED: 12,
+            GAME_RESET: 21,
+            CHANGE_ROUND: 22,
+            POP_QUESTION: 30,
+            CLEAR_QUESTION: 31,
+            PLAYER_BUZZED: 40,
+            CLEAR_BUZZ: 41,
+            CLEAR_ALL_BUZZES: 42,
+            UPDATE_SCORE: 50,
+            PLAY_SOUND: 60,
+            TOGGLE_SCOREBOARD: 70,
         };
 
         var question_data = {
@@ -166,14 +178,13 @@
         };
 
         var ws = null;
-        var game_started = false;
         var question_id = null;
         var question = null;
-        var buzzing_player = null;
+        var buzzes = [];
 
         function player_buzzed(id, name, no_sound=false) {
-            buzzing_player = id;
-            $("#buzzed").text(name);
+            buzzes.push(id);
+            $("#buzzed").append("<span>" + name + "</span>");
             $("#answer-controls .needs-buzz").attr("disabled", false);
             if (!no_sound) {
                 send_message(msg_types.PLAY_SOUND, {
@@ -182,13 +193,26 @@
             }
         }
 
-        function clear_buzzed(no_message=false) {
-            $("#buzzed").text("");
-            $("#answer-controls .needs-buzz").attr("disabled", true);
-            if (!no_message) {
-                send_message(msg_types.CLEAR_BUZZ);
+        function clear_buzzed(clear_all=false, no_message=false) {
+            if (clear_all) {
+                $("#buzzed span").remove();
+                buzzes = [];
             }
-            buzzing_player = null;
+            else {
+                $("#buzzed span:first").remove();
+                buzzes.shift();
+            }
+            if (buzzes.length == 0) {
+                $("#answer-controls .needs-buzz").attr("disabled", true);
+            }
+            if (!no_message) {
+                if (clear_all) {
+                    send_message(msg_types.CLEAR_ALL_BUZZES);
+                }
+                else {
+                    send_message(msg_types.CLEAR_BUZZ);
+                }
+            }
         }
 
         function pop_question(id=null, no_message=false) {
@@ -212,7 +236,7 @@
             if (question_id == "pop_test") {
                 answered = false;
             }
-            clear_buzzed(true);
+            clear_buzzed(true, no_message);
             $("#question-context").hide();
             if (!no_message) {
                 send_message(msg_types.CLEAR_QUESTION, {
@@ -222,6 +246,7 @@
             }
             if (answered) {
                 disable_question(question_id);
+                question_data[question_id].answered = true;
             }
             question = null;
             question_id = null;
@@ -232,6 +257,13 @@
                 .addClass("btn-secondary")
                 .removeClass("btn-primary")
                 .attr("disabled", true);
+        }
+
+        function enable_question(id) {
+            $("#question-" + id)
+                .addClass("btn-primary")
+                .removeClass("btn-secondary")
+                .attr("disabled", false);
         }
 
         function add_to_score(player_id, amount)
@@ -257,29 +289,6 @@
             $("#status").hide();
         }
 
-        function start_game(no_message=false) {
-            if (!no_message) {
-                send_message(msg_types.GAME_START);
-            }
-            game_started = true;
-            $("#start").attr("disabled", true);
-            $("#reset").attr("disabled", false);
-            $("#scoreboard").attr("disabled", false);
-            $("#pop-test").attr("disabled", false);
-        }
-
-        function reset_game(no_message=false) {
-            game_started = false;
-            if (!no_message) {
-                send_message(msg_types.GAME_RESET);
-            }
-            $("#start").attr("disabled", false);
-            $("#reset").attr("disabled", true);
-            $("#scoreboard").attr("disabled", true);
-            $("#pop-test").attr("disabled", true);
-            clear_question(false, true);
-        }
-
         function parse_message(msg) {
             switch (msg.type) {
                 case msg_types.ERROR:
@@ -295,17 +304,21 @@
                         };
                     }
                     break;
-                case msg_types.GAME_START:
-                    start_game(true);
-                    break;
                 case msg_types.GAME_RESET:
-                    reset_game(true);
+                case msg_types.CHANGE_ROUND:
+                    location.reload();
                     break;
                 case msg_types.POP_QUESTION:
                     pop_question(msg.question_id, true);
                     break;
                 case msg_types.PLAYER_BUZZED:
                     player_buzzed(msg.player_id, msg.player_name, msg.no_sound);
+                    break;
+                case msg_types.CLEAR_BUZZ:
+                    clear_buzzed(false, true);
+                    break;
+                case msg_types.CLEAR_ALL_BUZZES:
+                    clear_buzzed(true, true);
                     break;
                 default:
                     console.error("Unhandled msg.type:", msg.type);
@@ -330,10 +343,6 @@
             ws.onopen = function (event) {
                 send_message(msg_types.ADMIN_CONNECTED);
                 clear_alert();
-                if (game_started) {
-                    // Make sure the middleware is up to date on the game state.
-                    send_message(msg_types.GAME_START);
-                }
             };
             ws.onmessage = function (event) {
                 var data = JSON.parse(event.data);
@@ -357,19 +366,21 @@
         });
 
         $("#correct").on("click", function () {
-            add_to_score(buzzing_player, question.points);
+            add_to_score(buzzes[0], question.points);
             clear_question(true);
         });
 
         $("#wrong").on("click", function () {
-            add_to_score(buzzing_player, -question.points);
-            clear_buzzed(true);
-            pop_question();
+            add_to_score(buzzes[0], -question.points);
+            clear_buzzed(false);
         });
 
         $("#clear-buzz").on("click", function () {
+            clear_buzzed(false);
+        });
+
+        $("#clear-all-buzzes").on("click", function () {
             clear_buzzed(true);
-            pop_question();
         });
 
         $("#back").on("click", function () {
@@ -383,12 +394,8 @@
             clear_question(true);
         });
 
-        $("#start").on("click", function () {
-            start_game();
-        });
-
         $("#reset").on("click", function () {
-            reset_game();
+            send_message(msg_types.GAME_RESET);
         });
 
         $("#scoreboard").on("click", function () {
@@ -397,6 +404,18 @@
 
         $("#pop-test").on("click", function () {
             pop_question("pop_test");
+        });
+
+        $("#previous-round").on("click", function () {
+            send_message(msg_types.CHANGE_ROUND, {
+                round: {{ game.current_round }} - 1,
+            });
+        });
+
+        $("#next-round").on("click", function () {
+            send_message(msg_types.CHANGE_ROUND, {
+                round: {{ game.current_round }} + 1,
+            });
         });
 
         // Disable all the answered questions.

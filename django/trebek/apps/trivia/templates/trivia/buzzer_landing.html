@@ -9,7 +9,7 @@
     <style>
         body {
             background: black;
-            color: #fcfbf6;
+            color: white;
         }
 
         #buttons {
@@ -36,11 +36,6 @@
 
         .btn-success, .btn-danger, .btn-secondary {
             text-shadow: 0.08em 0.08em black;
-        }
-
-        .btn-success, .btn-success:hover, .btn-success:focus, .btn-success:active {
-            background-color: orange !important;
-            border-color: orange !important;
         }
 
         img.reconnecting {
@@ -73,18 +68,20 @@
 
         var msg_types = {
             ERROR: 0,
-            ADMIN_CONNECTED: 1,
-            DISPLAY_CONNECTED: 2,
-            PLAYER_CONNECTED: 3,
-            GAME_START: 4,
-            GAME_RESET: 5,
-            POP_QUESTION: 6,
-            CLEAR_QUESTION: 7,
-            PLAYER_BUZZED: 8,
-            CLEAR_BUZZ: 9,
-            UPDATE_SCORE: 10,
-            PLAY_SOUND: 11,
-            TOGGLE_SCOREBOARD: 12,
+            PING: 1,
+            ADMIN_CONNECTED: 10,
+            DISPLAY_CONNECTED: 11,
+            PLAYER_CONNECTED: 12,
+            GAME_RESET: 21,
+            CHANGE_ROUND: 22,
+            POP_QUESTION: 30,
+            CLEAR_QUESTION: 31,
+            PLAYER_BUZZED: 40,
+            CLEAR_BUZZ: 41,
+            CLEAR_ALL_BUZZES: 42,
+            UPDATE_SCORE: 50,
+            PLAY_SOUND: 60,
+            TOGGLE_SCOREBOARD: 70,
         };
 
         var button_states = {
@@ -100,7 +97,6 @@
         var ws = null;
         var button_state = button_states.CONNECTING;
         var admin_connected = false;
-        var game_started = false;
         var question_id = null;
         var player_buzzed = false;
 
@@ -128,19 +124,6 @@
                     button_contents = "Waiting for start..";
                     button_class = "btn-warning";
                     break;
-                case button_states.WAITING_QUESTION:
-                    button_contents = "Waiting for question..";
-                    button_class = "btn-secondary";
-                    break;
-                case button_states.WAITING_ANSWER:
-                    button_contents = "Waiting for answer..";
-                    button_class = "btn-secondary";
-                    break;
-                case button_states.READY:
-                    button_contents = "BUZZ!";
-                    button_class = "btn-success";
-                    disabled = false;
-                    break;
                 default:
                     button_contents = "Error!";
                     console.error("Unknown button state", new_state);
@@ -160,29 +143,9 @@
             else if (!admin_connected) {
                 update_button(button_states.WAITING_ADMIN);
             }
-            else if (!game_started) {
+            else {
                 update_button(button_states.WAITING_START);
             }
-            else if (!question_id) {
-                update_button(button_states.WAITING_QUESTION);
-            }
-            else if (player_buzzed) {
-                update_button(button_states.WAITING_ANSWER);
-            }
-            else {
-                update_button(button_states.READY);
-            }
-        }
-
-        function show_question(question_text) {
-            $("body").css("background", "#6d2d00");
-            $("#question p").html(question_text);
-            $("#question").show();
-        }
-
-        function hide_question() {
-            $("body").css("background", "black");
-            $("#question").hide();
         }
 
         function parse_message(msg) {
@@ -194,36 +157,15 @@
                     admin_connected = true;
                     check_ready_state();
                     break;
-                case msg_types.GAME_START:
-                    game_started = true;
-                    check_ready_state();
-                    break;
                 case msg_types.GAME_RESET:
-                    // We don't track much state, so just reload the page.
+                case msg_types.CHANGE_ROUND:
                     location.reload();
                     break;
                 case msg_types.POP_QUESTION:
-                    question_id = msg.question_id;
-                    player_buzzed = false;
-                    show_question(msg.question_text);
-                    check_ready_state();
-                    break;
                 case msg_types.CLEAR_QUESTION:
-                    question_id = null;
-                    player_buzzed = false;
-                    hide_question();
-                    check_ready_state();
-                    break;
                 case msg_types.PLAYER_BUZZED:
-                    player_buzzed = true;
-                    check_ready_state();
-                    break;
                 case msg_types.CLEAR_BUZZ:
-                    player_buzzed = false;
-                    check_ready_state();
-                    break;
                 case msg_types.UPDATE_SCORE:
-                    break;
                 case msg_types.PLAY_SOUND:
                     break;
                 default:

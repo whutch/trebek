@@ -23,6 +23,7 @@ class QuestionCategory(models.Model):
 
     title = models.CharField(max_length=100)
     order = models.PositiveSmallIntegerField(default=0)
+    round = models.PositiveSmallIntegerField(default=1)
 
     class Meta:
         ordering = ("order", "title",)
@@ -55,7 +56,8 @@ class Game(models.Model):
     name = models.CharField(max_length=100)
     date = models.DateField()
     key = models.CharField(max_length=4, unique=True)
-    started = models.BooleanField(default=False)
+    final_round = models.PositiveSmallIntegerField(default=3)
+    current_round = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         ordering = ("date", "name")

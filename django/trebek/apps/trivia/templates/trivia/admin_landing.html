@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% load static %}
+
+
+{% block page_title %}Admin{% endblock %}
+
+
+{% block page_styles %}
+    <style>
+        div.row {
+            margin-top: 0.5em;
+        }
+
+        .category {
+            min-height: 4em;
+        }
+
+        button.question {
+            margin-bottom: 0.5em;
+            width: 100%;
+        }
+
+        #question-context {
+            display: none;
+        }
+
+        #buzzed {
+            color: blue;
+            font-weight: bold;
+        }
+
+        img.reconnecting {
+            height: 1em;
+        }
+
+        #status {
+            display: none;
+        }
+    </style>
+{% endblock %}
+
+
+{% block page_content %}
+    <div class="container">
+        <div class="row" id="status">
+            <div class="col">
+                <div class="alert" role="alert"></div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                <button type="button" class="btn btn-success" id="start">Start</button>
+            </div>
+        </div>
+        <hr/>
+    </div>
+{% endblock %}
+
+
+{% block page_scripts %}
+    <script type="text/javascript">
+
+        var msg_types = {
+            ERROR: 0,
+            PING: 1,
+            ADMIN_CONNECTED: 10,
+            DISPLAY_CONNECTED: 11,
+            PLAYER_CONNECTED: 12,
+            GAME_RESET: 21,
+            CHANGE_ROUND: 22,
+            POP_QUESTION: 30,
+            CLEAR_QUESTION: 31,
+            PLAYER_BUZZED: 40,
+            CLEAR_BUZZ: 41,
+            CLEAR_ALL_BUZZES: 42,
+            UPDATE_SCORE: 50,
+            PLAY_SOUND: 60,
+            TOGGLE_SCOREBOARD: 70,
+        };
+
+        var ws = null;
+
+        function show_alert(html, alert_class="danger") {
+            $("#status .alert")
+                .html(html)
+                .removeClass(function (index, classes) {
+                    return (classes.match(/(^|\s)alert-\S+/g) || []).join(' ');
+                })
+                .addClass("alert-" + alert_class);
+            $("#status").show();
+        }
+
+        function clear_alert() {
+            $("#status").hide();
+        }
+
+        function parse_message(msg) {
+            switch (msg.type) {
+                case msg_types.ERROR:
+                    console.error("Received error from middleware:", msg.error);
+                    return;
+                case msg_types.ADMIN_CONNECTED:
+                    break;
+                case msg_types.PLAYER_CONNECTED:
+                    break;
+                case msg_types.GAME_RESET:
+                case msg_types.CHANGE_ROUND:
+                    location.reload();
+                    break;
+                case msg_types.POP_QUESTION:
+                    break;
+                case msg_types.PLAYER_BUZZED:
+                    break;
+                default:
+                    console.error("Unhandled msg.type:", msg.type);
+                    return;
+            }
+        }
+
+        function send_message(type, data={}) {
+            Object.assign(data, {
+                type: type,
+                game_key: "{{ game.key }}",
+            });
+            if (!ws || ws.readyState != WebSocket.OPEN) {
+                console.error("Could not send msg, websocket closed:", data);
+                return;
+            }
+            ws.send(JSON.stringify(data));
+        }
+
+        function connect(uri) {
+            ws = new WebSocket(uri);
+            ws.onopen = function (event) {
+                send_message(msg_types.ADMIN_CONNECTED);
+                clear_alert();
+            };
+            ws.onmessage = function (event) {
+                var data = JSON.parse(event.data);
+                parse_message(data);
+            };
+            ws.onclose = function () {
+                show_alert("Reconnecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>");
+                clear_question(false, true);
+                // The reconnection attempt will happen when the next check_connection interval fires.
+            }
+        }
+
+        function check_connection() {
+            if (!ws || ws.readyState == WebSocket.CLOSED) {
+                connect("{{ ws_uri }}");
+            }
+        }
+
+        $("#start").on("click", function () {
+            send_message(msg_types.CHANGE_ROUND, {
+                round: 1,
+            });
+        });
+
+        // Open the initial websocket connection.
+        show_alert("Connecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>", "warning");
+        check_connection();
+        // Set up a timer to keep reconnecting on disconnect.
+        setInterval(check_connection, 5000);
+    </script>
+{% endblock %}

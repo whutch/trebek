@@ -5,6 +5,7 @@
 # :license: MIT (https://github.com/whutch/trebek/blob/master/LICENSE.txt)
 
 import asyncio
+from collections import deque
 import itertools
 import json
 import logging
@@ -41,6 +42,7 @@ class MessageTypes:
     CLEAR_QUESTION = 31
     PLAYER_BUZZED = 40
     CLEAR_BUZZ = 41
+    CLEAR_ALL_BUZZES = 42
     UPDATE_SCORE = 50
     PLAY_SOUND = 60
     TOGGLE_SCOREBOARD = 70
@@ -93,7 +95,7 @@ class Game:
         self.popped_question_uuid = None
         self.popped_question_real_id = None
         self.popped_question_text = None
-        self.buzzing_player = None
+        self.buzzes = deque()
         self._game = models.Game.objects.get(key=game_key)
         GAMES[game_key] = self
 
@@ -177,12 +179,13 @@ class Admin(Client):
             await admin.send_message(MessageTypes.POP_QUESTION, {
                 "question_id": admin.game.popped_question_real_id,
             })
-        # If a player has buzzed, let the admin know.
-        if admin.game.buzzing_player:
+        # If players have buzzed, let the admin know.
+        for buzz in admin.game.buzzes:
             msg_data = {
+                "player_id": buzz.id,
+                "player_name": buzz.name,
                 "no_sound": True,
             }
-            msg_data.update(admin.game.buzzing_player)
             await admin.send_message(MessageTypes.PLAYER_BUZZED, msg_data)
         return admin
 
@@ -194,7 +197,7 @@ class Admin(Client):
             self.game.popped_question_real_id = None
             self.game.popped_question_uuid = None
             self.game.popped_question_text = None
-            self.game.buzzing_player = None
+            self.game.buzzes.clear()
             self.game.round = 0
             # Delete all question states for this game.
             models.QuestionState.objects.filter(game__key=self.game.key).delete()
@@ -212,7 +215,7 @@ class Admin(Client):
             self.game.popped_question_real_id = None
             self.game.popped_question_uuid = None
             self.game.popped_question_text = None
-            self.game.buzzed_player = None
+            self.game.buzzes.clear()
             self.game.round = msg_data["round"]
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
@@ -220,7 +223,7 @@ class Admin(Client):
         elif msg_type == MessageTypes.POP_QUESTION:
             self.game.popped_question_real_id = msg_data["question_id"]
             self.game.popped_question_text = msg_data["question_text"]
-            self.game.buzzing_player = None
+            self.game.buzzes.clear()
             # Pass it on to the displays.
             for display in self.game.displays:
                 await display.send_message(MessageTypes.POP_QUESTION, msg_data)
@@ -234,7 +237,7 @@ class Admin(Client):
             self.game.popped_question_real_id = None
             self.game.popped_question_uuid = None
             self.game.popped_question_text = None
-            self.game.buzzing_player = None
+            self.game.buzzes.clear()
             # Mark the question as answered.
             if msg_data.get("answered"):
                 question_id = msg_data["question_id"]
@@ -247,12 +250,19 @@ class Admin(Client):
             for player in self.game.players:
                 await player.send_message(MessageTypes.CLEAR_QUESTION, msg_data)
         elif msg_type == MessageTypes.CLEAR_BUZZ:
-            self.game.buzzing_player = None
-            # Pass it on to everything.
-            for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
-                if client is self:
+            self.game.buzzes.popleft()
+            # Pass it on to other admins.
+            for admin in self.game.admins:
+                if admin is self:
                     continue
-                await client.send_message(MessageTypes.CLEAR_BUZZ)
+                await admin.send_message(MessageTypes.CLEAR_BUZZ)
+        elif msg_type == MessageTypes.CLEAR_ALL_BUZZES:
+            self.game.buzzes.clear()
+            # Pass it on to other admins.
+            for admin in self.game.admins:
+                if admin is self:
+                    continue
+                await admin.send_message(MessageTypes.CLEAR_ALL_BUZZES)
         elif msg_type == MessageTypes.UPDATE_SCORE:
             player_id = msg_data["player_id"]
             score = msg_data["score"]
@@ -286,9 +296,6 @@ class Display(Client):
                 "question_id": display.game.popped_question_real_id,
                 "question_text": display.game.popped_question_text,
             })
-        # If a player has buzzed, let the display know.
-        if display.game.buzzing_player:
-            await display.send_message(MessageTypes.PLAYER_BUZZED, display.game.buzzing_player)
         return display
 
     async def handle_message(self, msg_type, msg_data):
@@ -326,9 +333,6 @@ class Player(Client):
                 "question_id": player.game.popped_question_uuid,
                 "question_text": player.game.popped_question_text,
             })
-        # If any player has buzzed, let this player know.
-        if player.game.buzzing_player:
-            await player.send_message(MessageTypes.PLAYER_BUZZED, player.game.buzzing_player)
         return player
 
     async def handle_message(self, msg_type, msg_data):
@@ -338,11 +342,10 @@ class Player(Client):
             question_id = msg_data["question_id"]
             if question_id != self.game.popped_question_uuid:
                 return
-            if self.game.buzzing_player:
-                # Only the first player to buzz a given UUID will get passed on.
+            if self in self.game.buzzes:
                 return
             log.info(f"Player '{self.name}' ({self.id}) buzzed in game {self.game.key}.")
-            self.game.buzzing_player = msg_data
+            self.game.buzzes.append(self)
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.PLAYER_BUZZED, msg_data)

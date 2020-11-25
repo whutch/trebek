@@ -77,6 +77,7 @@
             CLEAR_QUESTION: 31,
             PLAYER_BUZZED: 40,
             CLEAR_BUZZ: 41,
+            CLEAR_ALL_BUZZES: 42,
             UPDATE_SCORE: 50,
             PLAY_SOUND: 60,
             TOGGLE_SCOREBOARD: 70,
@@ -96,7 +97,6 @@
         var button_state = button_states.CONNECTING;
         var admin_connected = false;
         var question_id = null;
-        var player_buzzed = false;
 
         function update_button(new_state) {
             if (button_state == new_state) {
@@ -157,9 +157,6 @@
             else if (!question_id) {
                 update_button(button_states.WAITING_QUESTION);
             }
-            else if (player_buzzed) {
-                update_button(button_states.WAITING_ANSWER);
-            }
             else {
                 update_button(button_states.READY);
             }
@@ -191,23 +188,17 @@
                     break;
                 case msg_types.POP_QUESTION:
                     question_id = msg.question_id;
-                    player_buzzed = false;
                     show_question(msg.question_text);
                     check_ready_state();
                     break;
                 case msg_types.CLEAR_QUESTION:
                     question_id = null;
-                    player_buzzed = false;
                     hide_question();
                     check_ready_state();
                     break;
                 case msg_types.PLAYER_BUZZED:
-                    player_buzzed = true;
-                    check_ready_state();
                     break;
                 case msg_types.CLEAR_BUZZ:
-                    player_buzzed = false;
-                    check_ready_state();
                     break;
                 case msg_types.UPDATE_SCORE:
                     break;

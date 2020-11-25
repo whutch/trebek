@@ -29,6 +29,10 @@
             font-weight: bold;
         }
 
+        #buzzed span {
+            margin-left: 1em;
+        }
+
         img.reconnecting {
             height: 1em;
         }
@@ -92,7 +96,10 @@
                         <button type="button" class="btn btn-danger needs-buzz" id="wrong" disabled>Wrong</button>
                     </div>
                     <div class="col">
-                        <button type="button" class="btn btn-secondary needs-buzz" id="clear-buzz" disabled>Clear</button>
+                        <button type="button" class="btn btn-secondary needs-buzz" id="clear-buzz" disabled>Clear One</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-dark needs-buzz" id="clear-all-buzzes" disabled>Clear All</button>
                     </div>
                 </div>
                 <div class="row">
@@ -135,6 +142,7 @@
             CLEAR_QUESTION: 31,
             PLAYER_BUZZED: 40,
             CLEAR_BUZZ: 41,
+            CLEAR_ALL_BUZZES: 42,
             UPDATE_SCORE: 50,
             PLAY_SOUND: 60,
             TOGGLE_SCOREBOARD: 70,
@@ -171,11 +179,11 @@
         var ws = null;
         var question_id = null;
         var question = null;
-        var buzzing_player = null;
+        var buzzes = [];
 
         function player_buzzed(id, name, no_sound=false) {
-            buzzing_player = id;
-            $("#buzzed").text(name);
+            buzzes.push(id);
+            $("#buzzed").append("<span>" + name + "</span>");
             $("#answer-controls .needs-buzz").attr("disabled", false);
             if (!no_sound) {
                 send_message(msg_types.PLAY_SOUND, {
@@ -184,13 +192,26 @@
             }
         }
 
-        function clear_buzzed(no_message=false) {
-            $("#buzzed").text("");
-            $("#answer-controls .needs-buzz").attr("disabled", true);
-            if (!no_message) {
-                send_message(msg_types.CLEAR_BUZZ);
+        function clear_buzzed(clear_all=false, no_message=false) {
+            if (clear_all) {
+                $("#buzzed span").remove();
+                buzzes = [];
             }
-            buzzing_player = null;
+            else {
+                $("#buzzed span:first").remove();
+                buzzes.shift();
+            }
+            if (buzzes.length == 0) {
+                $("#answer-controls .needs-buzz").attr("disabled", true);
+            }
+            if (!no_message) {
+                if (clear_all) {
+                    send_message(msg_types.CLEAR_ALL_BUZZES);
+                }
+                else {
+                    send_message(msg_types.CLEAR_BUZZ);
+                }
+            }
         }
 
         function pop_question(id=null, no_message=false) {
@@ -214,7 +235,7 @@
             if (question_id == "pop_test") {
                 answered = false;
             }
-            clear_buzzed(true);
+            clear_buzzed(true, no_message);
             $("#question-context").hide();
             if (!no_message) {
                 send_message(msg_types.CLEAR_QUESTION, {
@@ -292,6 +313,12 @@
                 case msg_types.PLAYER_BUZZED:
                     player_buzzed(msg.player_id, msg.player_name, msg.no_sound);
                     break;
+                case msg_types.CLEAR_BUZZ:
+                    clear_buzzed(false, true);
+                    break;
+                case msg_types.CLEAR_ALL_BUZZES:
+                    clear_buzzed(true, true);
+                    break;
                 default:
                     console.error("Unhandled msg.type:", msg.type);
                     return;
@@ -338,19 +365,21 @@
         });
 
         $("#correct").on("click", function () {
-            add_to_score(buzzing_player, question.points);
+            add_to_score(buzzes[0], question.points);
             clear_question(true);
         });
 
         $("#wrong").on("click", function () {
-            add_to_score(buzzing_player, -question.points);
-            clear_buzzed(true);
-            pop_question();
+            add_to_score(buzzes[0], -question.points);
+            clear_buzzed(false);
         });
 
         $("#clear-buzz").on("click", function () {
+            clear_buzzed(false);
+        });
+
+        $("#clear-all-buzzes").on("click", function () {
             clear_buzzed(true);
-            pop_question();
         });
 
         $("#back").on("click", function () {

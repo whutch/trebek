@@ -237,8 +237,10 @@
                 question_box = $(".question:first");
             }
             var popup = $("<div class='question-popup'></div>").appendTo($("body"));
-            var popup_text = $("<p></p>").appendTo(popup);
-            popup_text.text(text);
+            // TODO: DON'T PUT RAW HTML IN HERE, USE A MARKUP RENDERER TO ALLOW TAGS SAFELY
+            var popup_text = $("<p> "+ text + "</p>").appendTo(popup);
+            //var popup_text = $("<p></p>").appendTo(popup);
+            //popup_text.text(text);
             popup.width(question_box.width());
             popup.height(question_box.outerHeight());
             popup.css(question_box.offset());

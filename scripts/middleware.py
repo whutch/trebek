@@ -16,6 +16,7 @@ import sys
 import time
 import uuid
 
+from asgiref.sync import sync_to_async
 import django
 import websockets
 
@@ -56,23 +57,23 @@ log = logging.getLogger("middleware")
 GAMES = {}
 
 
-def mark_question_answered(game_key, question_id):
+async def mark_question_answered(game_key, question_id):
     try:
-        question = models.Question.objects.get(id=question_id)
+        question = await sync_to_async(models.Question.objects.get)(id=question_id)
     except models.Question.DoesNotExist:
         log.warning(f"Tried to clear non-existent question: {question_id}")
         return
     try:
-        game = models.Game.objects.get(key=game_key)
+        game = await sync_to_async(models.Game.objects.get)(key=game_key)
     except models.Game.DoesNotExist:
         log.warning(f"Game key does not exist in database: {game_key}")
         return
     try:
-        state = question.questionstate_set.get(game=game)
+        state = await sync_to_async(question.questionstate_set.get)(game=game)
     except models.QuestionState.DoesNotExist:
         state = models.QuestionState(question=question, game=game)
         state.answered = True
-        state.save()
+        await sync_to_async(state.save)()
 
 
 def parse_message(msg):
@@ -98,15 +99,17 @@ class Game:
         self.popped_question_real_id = None
         self.popped_question_text = None
         self.buzzes = deque()
-        self._game = models.Game.objects.get(key=game_key)
+        self._game = None
         GAMES[game_key] = self
 
-    @property
-    def round(self):
+    def get_round(self):
+        if not self._game:
+            self._game = models.Game.objects.get(key=self.key)
         return self._game.current_round
 
-    @round.setter
-    def round(self, value):
+    def set_round(self, value):
+        if not self._game:
+            self._game = models.Game.objects.get(key=self.key)
         self._game.current_round = value
         self._game.save()
 
@@ -200,25 +203,32 @@ class Admin(Client):
             self.game.popped_question_uuid = None
             self.game.popped_question_text = None
             self.game.buzzes.clear()
-            self.game.round = 0
+            await sync_to_async(self.game.set_round)(0)
             # Delete all question states for this game.
-            models.QuestionState.objects.filter(game__key=self.game.key).delete()
+            questions = await sync_to_async(models.QuestionState.objects.filter)(game__key=self.game.key)
+            await sync_to_async(questions.delete)()
             # Reset all scores.
-            for player in models.Player.objects.filter(game__key=self.game.key):
-                player.score = 0
-                player.save()
+            players = await sync_to_async(models.Player.objects.filter)(game__key=self.game.key)
+            def _reset_scores():
+                for player in players:
+                    player.score = 0
+                    player.save()
+            await sync_to_async(_reset_scores)()
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.GAME_RESET)
         elif msg_type == MessageTypes.CHANGE_ROUND:
-            if self.game.round == msg_data["round"] or msg_data["round"] < 1:
+            if msg_data["round"] < 1:
+                return
+            round = await sync_to_async(self.game.get_round)()
+            if round == msg_data["round"]:
                 return
             log.info(f"Changing to round {msg_data['round']} in game {self.game.key}.")
             self.game.popped_question_real_id = None
             self.game.popped_question_uuid = None
             self.game.popped_question_text = None
             self.game.buzzes.clear()
-            self.game.round = msg_data["round"]
+            await sync_to_async(self.game.set_round)(msg_data["round"])
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.CHANGE_ROUND, msg_data)
@@ -248,7 +258,7 @@ class Admin(Client):
             # Mark the question as answered.
             if msg_data.get("answered"):
                 question_id = msg_data["question_id"]
-                mark_question_answered(self.game.key, question_id)
+                await mark_question_answered(self.game.key, question_id)
             # Pass it on to the displays.
             for display in self.game.displays:
                 await display.send_message(MessageTypes.CLEAR_QUESTION, msg_data)
@@ -273,10 +283,10 @@ class Admin(Client):
         elif msg_type == MessageTypes.UPDATE_SCORE:
             player_id = msg_data["player_id"]
             score = msg_data["score"]
-            player = models.Player.objects.get(id=player_id)
+            player = await sync_to_async(models.Player.objects.get)(id=player_id)
             log.info(f"Received score update for player '{player.name}' ({player.id}) of game {self.game.key}, new value is {score}.")
             player.score = score
-            player.save()
+            await sync_to_async(player.save)()
             # Pass it on to the displays.
             for display in self.game.displays:
                 await display.send_message(MessageTypes.UPDATE_SCORE, msg_data)
@@ -328,12 +338,12 @@ class Player(Client):
         if player.game.admins:
             await player.send_message(MessageTypes.ADMIN_CONNECTED)
         # Pass the player data on to the admins and displays.
-        score = models.Player.objects.get(id=player.id).score
+        player_object = await sync_to_async(models.Player.objects.get)(id=player.id)
         for client in itertools.chain(player.game.admins, player.game.displays):
             await client.send_message(MessageTypes.PLAYER_CONNECTED, {
                 "player_id": player.id,
                 "player_name": player.name,
-                "score": score,
+                "score": player_object.score,
             })
         # If there is a question popped, let the player know.
         if player.game.popped_question_real_id:

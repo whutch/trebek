@@ -8,4 +8,5 @@ from django.apps import AppConfig
 
 
 class TriviaConfig(AppConfig):
-    name = 'trivia'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "trebek.apps.trivia"

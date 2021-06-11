@@ -113,6 +113,11 @@ class Game:
         self._game.current_round = value
         self._game.save()
 
+    def get_final_round(self):
+        if not self._game:
+            self._game = models.Game.objects.get(key=self.key)
+        return self._game.final_round
+
     def register_client(self, client):
         if isinstance(client, Admin):
             log.info(f"Registering admin for game {self.key}.")
@@ -218,17 +223,19 @@ class Admin(Client):
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.GAME_RESET)
         elif msg_type == MessageTypes.CHANGE_ROUND:
-            if msg_data["round"] < 1:
+            new_round = msg_data["round"]
+            if new_round < 1:
                 return
             round = await sync_to_async(self.game.get_round)()
-            if round == msg_data["round"]:
+            final_round = await sync_to_async(self.game.get_final_round)()
+            if round == new_round or new_round > final_round:
                 return
-            log.info(f"Changing to round {msg_data['round']} in game {self.game.key}.")
+            log.info(f"Changing to round {new_round} in game {self.game.key}.")
             self.game.popped_question_real_id = None
             self.game.popped_question_uuid = None
             self.game.popped_question_text = None
             self.game.buzzes.clear()
-            await sync_to_async(self.game.set_round)(msg_data["round"])
+            await sync_to_async(self.game.set_round)(new_round)
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.CHANGE_ROUND, msg_data)

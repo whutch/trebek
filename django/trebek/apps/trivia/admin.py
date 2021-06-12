@@ -10,7 +10,7 @@ from . import models
 
 
 admin.site.register(models.UserData)
-admin.site.register(models.QuestionCategory)
+admin.site.register(models.Category)
 admin.site.register(models.Question)
 admin.site.register(models.Game)
 admin.site.register(models.GameRound)

@@ -20,13 +20,13 @@ class UserData(models.Model):
         return str(self.user)
 
 
-class QuestionCategory(models.Model):
+class Category(models.Model):
 
     title = models.CharField(max_length=100)
 
     class Meta:
         ordering = ("title",)
-        verbose_name_plural = "question categories"
+        verbose_name_plural = "categories"
 
     def __str__(self):
         return str(self.title)
@@ -35,7 +35,7 @@ class QuestionCategory(models.Model):
 class Question(models.Model):
 
     category = models.ForeignKey(
-        QuestionCategory, blank=True, null=True, on_delete=models.SET_NULL, related_name="questions")
+        Category, blank=True, null=True, on_delete=models.SET_NULL, related_name="questions")
     text = models.CharField(max_length=200)
     answer = models.CharField(max_length=200)
     point_value = models.PositiveSmallIntegerField(default=200)
@@ -77,7 +77,7 @@ class GameRound(models.Model):
 
     game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="rounds")
     categories = models.ManyToManyField(
-        QuestionCategory, blank=True, related_name="game_rounds", through="CategoryState")
+        Category, blank=True, related_name="game_rounds", through="CategoryState")
     questions = models.ManyToManyField(
         Question, blank=True, related_name="games", through="QuestionState")
     round = models.PositiveSmallIntegerField(default=1)
@@ -94,7 +94,7 @@ class GameRound(models.Model):
 class CategoryState(models.Model):
 
     game_round = models.ForeignKey(GameRound, on_delete=models.CASCADE)
-    category = models.ForeignKey(QuestionCategory, on_delete=models.CASCADE)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE)
     order = models.PositiveSmallIntegerField(default=1)
 
     class Meta:

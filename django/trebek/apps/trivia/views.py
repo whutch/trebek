@@ -15,7 +15,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 import websockets
 
-from .models import Game, Player, QuestionState
+from .models import Game, Player
 
 
 if settings.ENABLE_SSL:
@@ -106,23 +106,21 @@ def admin(request, game_key):
     }
     if game.current_round == 0:
         return render(request, "trivia/admin_landing.html", context)
+    game_round = game.rounds.get(round=game.current_round)
     categories = []
-    for category in game.categories.filter(round=game.current_round):
+    for category_state in game_round.categorystate_set.all():
         questions = []
-        for question in category.questions.all():
+        for question_state in game_round.questionstate_set.filter(question__category=category_state.category):
+            question = question_state.question
             question_data = {
                 "id": question.id,
                 "text": question.text,
                 "answer": question.answer,
                 "point_value": question.point_value,
+                "answered": question_state.answered,
             }
-            try:
-                state = question.questionstate_set.get(game=game)
-            except QuestionState.DoesNotExist:
-                state = None
-            question_data["answered"] = state.answered if state else False
             questions.append(question_data)
-        categories.append([category, questions])
+        categories.append([category_state.category, questions])
     context["categories"] = categories
     return render(request, "trivia/admin_round.html", context)
 
@@ -137,23 +135,21 @@ def display(request, game_key):
     if game.current_round == 0:
         context["host_url"] = request.META["HTTP_HOST"]
         return render(request, "trivia/display_landing.html", context)
+    game_round = game.rounds.get(round=game.current_round)
     categories = []
-    for category in game.categories.filter(round=game.current_round):
+    for category_state in game_round.categorystate_set.all():
         questions = []
-        for question in category.questions.all():
+        for question_state in game_round.questionstate_set.filter(question__category=category_state.category):
+            question = question_state.question
             question_data = {
                 "id": question.id,
                 "text": question.text,
                 "answer": question.answer,
                 "point_value": question.point_value,
+                "answered": question_state.answered,
             }
-            try:
-                state = question.questionstate_set.get(game=game)
-            except QuestionState.DoesNotExist:
-                state = None
-            question_data["answered"] = state.answered if state else False
             questions.append(question_data)
-        categories.append([category, questions])
+        categories.append([category_state.category, questions])
     context["categories"] = categories
     return render(request, "trivia/display_round.html", context)
 

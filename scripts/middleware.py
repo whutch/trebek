@@ -59,21 +59,17 @@ GAMES = {}
 
 async def mark_question_answered(game_key, question_id):
     try:
-        question = await sync_to_async(models.Question.objects.get)(id=question_id)
-    except models.Question.DoesNotExist:
-        log.warning(f"Tried to clear non-existent question: {question_id}")
-        return
-    try:
         game = await sync_to_async(models.Game.objects.get)(key=game_key)
     except models.Game.DoesNotExist:
         log.warning(f"Game key does not exist in database: {game_key}")
         return
     try:
-        state = await sync_to_async(question.questionstate_set.get)(game=game)
-    except models.QuestionState.DoesNotExist:
-        state = models.QuestionState(question=question, game=game)
-        state.answered = True
-        await sync_to_async(state.save)()
+        question_state = await sync_to_async(models.QuestionState.objects.get)(game_round__game=game, question__id=question_id)
+    except models.Question.DoesNotExist:
+        log.warning(f"Question does not have state in game: {question_id}, {game_key}")
+        return
+    question_state.answered = True
+    await sync_to_async(question_state.save)()
 
 
 def parse_message(msg):
@@ -116,7 +112,12 @@ class Game:
     def get_final_round(self):
         if not self._game:
             self._game = models.Game.objects.get(key=self.key)
-        return self._game.final_round
+        return self._game.rounds.last().round
+
+    def reset(self):
+        if not self._game:
+            self._game = models.Game.objects.get(key=self.key)
+        self._game.reset()
 
     def register_client(self, client):
         if isinstance(client, Admin):
@@ -208,17 +209,7 @@ class Admin(Client):
             self.game.popped_question_uuid = None
             self.game.popped_question_text = None
             self.game.buzzes.clear()
-            await sync_to_async(self.game.set_round)(0)
-            # Delete all question states for this game.
-            questions = await sync_to_async(models.QuestionState.objects.filter)(game__key=self.game.key)
-            await sync_to_async(questions.delete)()
-            # Reset all scores.
-            players = await sync_to_async(models.Player.objects.filter)(game__key=self.game.key)
-            def _reset_scores():
-                for player in players:
-                    player.score = 0
-                    player.save()
-            await sync_to_async(_reset_scores)()
+            await sync_to_async(self.game.reset)()
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.GAME_RESET)

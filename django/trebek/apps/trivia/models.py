@@ -4,6 +4,8 @@
 # :copyright: (c) 2018 Will Hutcheson
 # :license: MIT (https://github.com/whutch/trebek/blob/master/LICENSE.txt)
 
+import random
+
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -71,6 +73,25 @@ class Game(models.Model):
                 player.save()
         self.current_round = 0
         self.save()
+
+    def generate_questions(self):
+        # Delete any existing question states and reset the game.
+        for question_state in QuestionState.objects.filter(game_round__game=self):
+            question_state.delete()
+        self.reset()
+        # Randomly select questions from each point value group in each category.
+        point_groups = (200, 400, 600, 800, 1000)
+        for round in self.rounds.all():
+            for category in round.categories.all():
+                for point_value in point_groups:
+                    choices = category.questions.filter(point_value=point_value)
+                    if len(choices) < 1:
+                        continue
+                    question = random.choice(choices)
+                    question_state = QuestionState()
+                    question_state.game_round = round
+                    question_state.question = question
+                    question_state.save()
 
 
 class GameRound(models.Model):

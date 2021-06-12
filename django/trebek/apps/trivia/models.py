@@ -34,7 +34,8 @@ class QuestionCategory(models.Model):
 
 class Question(models.Model):
 
-    category = models.ForeignKey(QuestionCategory, on_delete=models.CASCADE, related_name="questions")
+    category = models.ForeignKey(
+        QuestionCategory, blank=True, null=True, on_delete=models.SET_NULL, related_name="questions")
     text = models.CharField(max_length=200)
     answer = models.CharField(max_length=200)
     point_value = models.PositiveSmallIntegerField(default=200)

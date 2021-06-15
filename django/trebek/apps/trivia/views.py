@@ -118,6 +118,7 @@ def admin(request, game_key):
                 "answer": question.answer,
                 "point_value": question_state.get_modified_point_value(),
                 "answered": question_state.answered,
+                "requires_wager": question_state.requires_wager,
             }
             questions.append(question_data)
         categories.append([category_state.category, questions])
@@ -165,6 +166,7 @@ def buzzer(request, game_key):
         "game": game,
         "player": player,
         "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0]),
+        "max_wager": max(player.score, game.current_round * 1000),
     }
     if game.current_round == 0:
         return render(request, "trivia/buzzer_landing.html", context)

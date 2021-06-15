@@ -43,10 +43,12 @@ class MessageTypes:
     CHANGE_ROUND = 22
     POP_QUESTION = 30
     CLEAR_QUESTION = 31
+    REQUIRE_WAGER = 32
     DISPLAY_TEXT = 34
     PLAYER_BUZZED = 40
     CLEAR_BUZZ = 41
     CLEAR_ALL_BUZZES = 42
+    PLAYER_ENTERED_WAGER = 43
     UPDATE_SCORE = 50
     PLAY_SOUND = 60
     TOGGLE_SCOREBOARD = 70
@@ -256,8 +258,13 @@ class Admin(Client):
             question_uuid = str(uuid.uuid4())
             self.game.popped_question_uuid = question_uuid
             msg_data["question_id"] = question_uuid
-            for player in self.game.players:
+            specific_player = msg_data.pop("specific_player")
+            if specific_player:
+                player = self.game.get_player_by_id(specific_player)
                 await player.send_message(MessageTypes.POP_QUESTION, msg_data)
+            else:
+                for player in self.game.players:
+                    await player.send_message(MessageTypes.POP_QUESTION, msg_data)
         elif msg_type == MessageTypes.CLEAR_QUESTION:
             self.game.popped_question_real_id = None
             self.game.popped_question_uuid = None
@@ -274,6 +281,22 @@ class Admin(Client):
             del msg_data["question_id"]
             for player in self.game.players:
                 await player.send_message(MessageTypes.CLEAR_QUESTION, msg_data)
+        elif msg_type == MessageTypes.REQUIRE_WAGER:
+            player_id = msg_data.pop("player_id")
+            round_max_wager = self.game.get_round() * 1000
+            if player_id:
+                player = self.game.get_player_by_id(player_id)
+                log.info(f"Received a wager request for player '{player.name}' ({player.id}) of game {self.game.key}.")
+                player_object = await sync_to_async(models.Player.objects.get)(id=player_id)
+                msg_data["max_wager"] = max(round_max_wager, player_object.score)
+                await player.send_message(MessageTypes.REQUIRE_WAGER, msg_data)
+            else:
+                # Send to all players.
+                log.info(f"Received a wager request for all players in game {self.game.key}.")
+                for player in self.game.players:
+                    player_object = await sync_to_async(models.Player.objects.get)(id=player.id)
+                    msg_data["max_wager"] = max(round_max_wager, player_object.score)
+                    await player.send_message(MessageTypes.REQUIRE_WAGER, msg_data)
         elif msg_type == MessageTypes.DISPLAY_TEXT:
             player_id = msg_data.pop("player_id")
             if player_id:
@@ -401,6 +424,12 @@ class Player(Client):
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.PLAYER_BUZZED, msg_data)
+        elif msg_type == MessageTypes.PLAYER_ENTERED_WAGER:
+            amount = msg_data["amount"]
+            log.info(f"Player '{self.name}' ({self.id}) submit a wager of {amount} in game {self.game.key}.")
+            # Pass it on to admins.
+            for admin in self.game.admins:
+                await admin.send_message(MessageTypes.PLAYER_ENTERED_WAGER, msg_data)
         else:
             log.warning(f"Player sent unhandled message type '{msg_type}': {msg_data}")
 

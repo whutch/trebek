@@ -39,6 +39,27 @@
             font-size: 200%;
         }
 
+        #wager-details {
+            display: none;
+            margin-top: 5vh;
+            font-size: 200%;
+        }
+
+        #wager-entry {
+            display: none;
+            margin-top: 5vh;
+        }
+
+        #wager-amount {
+            height: 3em;
+        }
+
+        #submit-wager {
+            margin-top: 1em;
+            width: 100%;
+            font-size: 200%;
+        }
+
         .btn-success, .btn-danger, .btn-secondary {
             text-shadow: 0.08em 0.08em black;
         }
@@ -72,6 +93,22 @@
                 <p></p>
             </div>
         </div>
+        <div class="row" id="wager-details">
+            <div class="col">
+                Minimum wager: <span id="min-wager">5</span>
+            </div>
+            <div class="col">
+                Maximum wager: <span id="max-wager">{{ max_wager }}</span>
+            </div>
+        </div>
+        <div class="row" id="wager-entry">
+            <div class="col">
+                <div class="form-group">
+                    <input type="text" class="form-control form-control-lg" id="wager-amount" placeholder="Wager amount" autocomplete="off"/>
+                    <button type="button" class="btn btn-primary" id="submit-wager">Submit wager</button>
+                </div>
+            </div>
+        </div>
     </div>
 {% endblock %}
 
@@ -89,10 +126,12 @@
             CHANGE_ROUND: 22,
             POP_QUESTION: 30,
             CLEAR_QUESTION: 31,
+            REQUIRE_WAGER: 32,
             DISPLAY_TEXT: 34,
             PLAYER_BUZZED: 40,
             CLEAR_BUZZ: 41,
             CLEAR_ALL_BUZZES: 42,
+            PLAYER_ENTERED_WAGER: 43,
             UPDATE_SCORE: 50,
             PLAY_SOUND: 60,
             TOGGLE_SCOREBOARD: 70,
@@ -112,6 +151,8 @@
         var button_state = button_states.CONNECTING;
         var admin_connected = false;
         var question_id = null;
+        var min_wager = 5;
+        var max_wager = {{ max_wager }};
 
         function update_button(new_state) {
             if (button_state == new_state) {
@@ -188,6 +229,19 @@
             $("#question").hide();
         }
 
+        function show_wager_entry() {
+            $("#buttons").hide();
+            $("#wager-details").show();
+            $("#wager-entry").show();
+        }
+
+        function hide_wager_entry() {
+            $("#wager-details").hide();
+            $("#wager-entry").hide();
+            $("#wager-amount").val("");
+            $("#buttons").show();
+        }
+
         function parse_message(msg) {
             switch (msg.type) {
                 case msg_types.ERROR:
@@ -212,7 +266,13 @@
                 case msg_types.CLEAR_QUESTION:
                     question_id = null;
                     hide_question();
+                    hide_wager_entry();
                     check_ready_state();
+                    break;
+                case msg_types.REQUIRE_WAGER:
+                    max_wager = msg.max_wager;
+                    $("#max-wager").text(max_wager);
+                    show_wager_entry();
                     break;
                 case msg_types.DISPLAY_TEXT:
                     break;
@@ -272,6 +332,18 @@
             send_message(msg_types.PLAYER_BUZZED, {
                 question_id: question_id,
             });
+        });
+
+        $("#submit-wager").on("click", function () {
+            var amount = parseInt($("#wager-amount").val());
+            if (isNaN(amount) || amount < min_wager || amount > max_wager)
+            {
+                return;
+            }
+            send_message(msg_types.PLAYER_ENTERED_WAGER, {
+                amount: amount,
+            });
+            hide_wager_entry();
         });
 
         // Open the initial websocket connection.

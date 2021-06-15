@@ -91,6 +91,24 @@ class Game(models.Model):
                     question_state.game_round = round
                     question_state.question = question
                     question_state.save()
+        # Choose the wager questions for each round.
+        choices = QuestionState.objects.filter(
+            game_round__game=self,
+            game_round__round=1,
+            question__point_value__gte=400,
+            question__point_value__lte=800)
+        question_state = random.choice(choices)
+        question_state.requires_wager = True
+        question_state.save()
+        choices = QuestionState.objects.filter(
+            game_round__game=self,
+            game_round__round=2,
+            question__point_value__gte=400,
+            question__point_value__lte=800)
+        choices = list(choices)
+        for question_state in random.sample(choices, 2):
+            question_state.requires_wager = True
+            question_state.save()
 
 
 class GameRound(models.Model):
@@ -138,6 +156,7 @@ class QuestionState(models.Model):
     game_round = models.ForeignKey(GameRound, on_delete=models.CASCADE)
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
     answered = models.BooleanField(default=False)
+    requires_wager = models.BooleanField(default=False)
 
     class Meta:
         ordering = ("game_round", "question")

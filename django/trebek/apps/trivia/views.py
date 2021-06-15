@@ -143,8 +143,6 @@ def display(request, game_key):
             question = question_state.question
             question_data = {
                 "id": question.id,
-                "text": question.text,
-                "answer": question.answer,
                 "point_value": question_state.get_modified_point_value(),
                 "answered": question_state.answered,
             }

@@ -116,7 +116,7 @@ def admin(request, game_key):
                 "id": question.id,
                 "text": question.text,
                 "answer": question.answer,
-                "point_value": question.point_value,
+                "point_value": question_state.get_modified_point_value(),
                 "answered": question_state.answered,
             }
             questions.append(question_data)
@@ -145,7 +145,7 @@ def display(request, game_key):
                 "id": question.id,
                 "text": question.text,
                 "answer": question.answer,
-                "point_value": question.point_value,
+                "point_value": question_state.get_modified_point_value(),
                 "answered": question_state.answered,
             }
             questions.append(question_data)

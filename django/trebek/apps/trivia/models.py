@@ -146,6 +146,9 @@ class QuestionState(models.Model):
     def __str__(self):
         return "{}: {}".format(self.game_round, self.question)
 
+    def get_modified_point_value(self):
+        return self.question.point_value * self.game_round.round
+
 
 class Player(models.Model):
 

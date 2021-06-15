@@ -76,8 +76,7 @@ class Game(models.Model):
 
     def generate_questions(self):
         # Delete any existing question states and reset the game.
-        for question_state in QuestionState.objects.filter(game_round__game=self):
-            question_state.delete()
+        QuestionState.objects.filter(game_round__game=self).delete()
         self.reset()
         # Randomly select questions from each point value group in each category.
         point_groups = (200, 400, 600, 800, 1000)

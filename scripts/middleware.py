@@ -311,6 +311,10 @@ class Admin(Client):
             # Pass it on to the displays.
             for display in self.game.displays:
                 await display.send_message(MessageTypes.UPDATE_SCORE, msg_data)
+            # Pass it on to the player.
+            player = self.game.get_player_by_id(player_id)
+            del msg_data["player_id"]
+            await player.send_message(MessageTypes.UPDATE_SCORE, msg_data)
         elif msg_type == MessageTypes.PLAY_SOUND:
             # Pass it on to the displays and players.
             for client in itertools.chain(self.game.displays, self.game.players):

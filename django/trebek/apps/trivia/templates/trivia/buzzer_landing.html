@@ -12,6 +12,11 @@
             color: white;
         }
 
+        #player-details {
+            margin-top: 5vh;
+            font-size: 200%;
+        }
+
         #buttons {
             margin-top: 5vh;
         }
@@ -47,6 +52,14 @@
 
 {% block page_content %}
     <div class="container">
+        <div class="row" id="player-details">
+            <div class="col">
+                <span id="player-name">{{ player.name }}</span>
+            </div>
+            <div class="col">
+                Score: <span id="player-score">{{ player.score }}</span>
+            </div>
+        </div>
         <div class="row" id="buttons">
             <div class="col">
                 <button type="button" class="btn btn-danger btn-lg" id="buzzer" disabled="true">

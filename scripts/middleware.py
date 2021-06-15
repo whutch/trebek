@@ -176,6 +176,9 @@ class Client:
         msg.update(msg_data)
         await self._ws.send(json.dumps(msg))
 
+    def clean_up(self):
+        raise NotImplementedError
+
 
 class Admin(Client):
 
@@ -300,6 +303,9 @@ class Admin(Client):
         else:
             log.warning(f"Admin sent unhandled message type '{msg_type}': {msg_data}")
 
+    def clean_up(self):
+        self.game.admins.remove(self)
+
 
 class Display(Client):
 
@@ -320,6 +326,9 @@ class Display(Client):
         else:
             # We don't currently handle any messages from displays.
             log.warning(f"Display sent unhandled message type '{msg_type}': {msg_data}")
+
+    def clean_up(self):
+        self.game.displays.remove(self)
 
 
 class Player(Client):
@@ -372,6 +381,9 @@ class Player(Client):
         else:
             log.warning(f"Player sent unhandled message type '{msg_type}': {msg_data}")
 
+    def clean_up(self):
+        self.game.players.remove(self)
+
 
 async def create_client(websocket):
     async for msg in websocket:
@@ -404,6 +416,7 @@ async def handle_websocket(websocket, path):
         log.info(f"Lost connection from {host}.")
     else:
         await websocket.close()
+        client.clean_up()
 
 
 def start_middleware():

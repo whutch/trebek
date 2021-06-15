@@ -76,6 +76,7 @@
             CHANGE_ROUND: 22,
             POP_QUESTION: 30,
             CLEAR_QUESTION: 31,
+            DISPLAY_TEXT: 34,
             PLAYER_BUZZED: 40,
             CLEAR_BUZZ: 41,
             CLEAR_ALL_BUZZES: 42,
@@ -199,6 +200,8 @@
                     question_id = null;
                     hide_question();
                     check_ready_state();
+                    break;
+                case msg_types.DISPLAY_TEXT:
                     break;
                 case msg_types.PLAYER_BUZZED:
                     break;

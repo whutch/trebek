@@ -43,6 +43,7 @@ class MessageTypes:
     CHANGE_ROUND = 22
     POP_QUESTION = 30
     CLEAR_QUESTION = 31
+    DISPLAY_TEXT = 34
     PLAYER_BUZZED = 40
     CLEAR_BUZZ = 41
     CLEAR_ALL_BUZZES = 42
@@ -133,6 +134,12 @@ class Game:
             log.error(f"Client subclass not recognized: {client}")
         else:
             log.error(f"Tried to register {client} as a client!")
+
+    def get_player_by_id(self, player_id):
+        for player in self.players:
+            if player.id == player_id:
+                return player
+        return None
 
 
 class Client:
@@ -267,6 +274,18 @@ class Admin(Client):
             del msg_data["question_id"]
             for player in self.game.players:
                 await player.send_message(MessageTypes.CLEAR_QUESTION, msg_data)
+        elif msg_type == MessageTypes.DISPLAY_TEXT:
+            player_id = msg_data.pop("player_id")
+            if player_id:
+                player = self.game.get_player_by_id(player_id)
+                await player.send_message(MessageTypes.DISPLAY_TEXT, msg_data)
+            else:
+                # Pass it on to all players.
+                for player in self.game.players:
+                    await player.send_message(MessageTypes.DISPLAY_TEXT, msg_data)
+            # Pass it on to the displays.
+            for display in self.game.displays:
+                await display.send_message(MessageTypes.DISPLAY_TEXT, msg_data)
         elif msg_type == MessageTypes.CLEAR_BUZZ:
             self.game.buzzes.popleft()
             # Pass it on to other admins.

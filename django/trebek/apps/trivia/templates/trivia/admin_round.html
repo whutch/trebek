@@ -33,6 +33,24 @@
             margin-left: 1em;
         }
 
+        #player-picker {
+            display: none;
+        }
+
+        #player-picker ul {
+            list-style-type: none;
+            margin: 1em;
+            padding: 0;
+        }
+
+        #player-picker ul li {
+            display: inline;
+        }
+
+        #player-picker ul li:not(:first-child) {
+            margin-left: 0.5em;
+        }
+
         img.reconnecting {
             height: 1em;
         }
@@ -108,6 +126,17 @@
                     </div>
                 </div>
             </div>
+        </div>
+        <div class="row" id="player-picker">
+            <ul>
+                {% for player in players %}
+                    <li>
+                        <button type="button" class="btn btn-primary" id="player-{{ player.id }}">
+                            {{ player.name }}
+                        </button>
+                    </li>
+                {% endfor %}
+            </ul>
         </div>
         <hr/>
         <div class="row">
@@ -274,6 +303,16 @@
                 player_id: player_id,
                 score: player_data[player_id].score,
             });
+        }
+
+        function show_player_picker(callback) {
+            $("#player-picker button").on("click.player-picker", function () {
+                player_id = $(this).attr("id").split("-")[1];
+                callback(player_id);
+                $("#player-picker").hide();
+                $("#player-picker button").off("click.player-picker");
+            });
+            $("#player-picker").show();
         }
 
         function show_alert(html, alert_class="danger") {

@@ -281,10 +281,11 @@ class Admin(Client):
         elif msg_type == MessageTypes.UPDATE_SCORE:
             player_id = msg_data["player_id"]
             score = msg_data["score"]
-            player = await sync_to_async(models.Player.objects.get)(id=player_id)
-            log.info(f"Received score update for player '{player.name}' ({player.id}) of game {self.game.key}, new value is {score}.")
-            player.score = score
-            await sync_to_async(player.save)()
+            player_object = await sync_to_async(models.Player.objects.get)(id=player_id)
+            log.info(f"Received score update for player '{player_object.name}' ({player_object.id})"
+                     f" of game {self.game.key}, new value is {score}.")
+            player_object.score = score
+            await sync_to_async(player_object.save)()
             # Pass it on to the displays.
             for display in self.game.displays:
                 await display.send_message(MessageTypes.UPDATE_SCORE, msg_data)

@@ -102,7 +102,7 @@ def admin(request, game_key):
     context = {
         "game": game,
         "players": Player.objects.filter(game=game),
-        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0])
+        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0]),
     }
     if game.current_round == 0:
         return render(request, "trivia/admin_landing.html", context)
@@ -130,7 +130,7 @@ def display(request, game_key):
     context = {
         "game": game,
         "players": Player.objects.filter(game=game),
-        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0])
+        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0]),
     }
     if game.current_round == 0:
         context["host_url"] = request.META["HTTP_HOST"]
@@ -166,7 +166,7 @@ def buzzer(request, game_key):
     context = {
         "game": game,
         "player": player,
-        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0])
+        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0]),
     }
     if game.current_round == 0:
         return render(request, "trivia/buzzer_landing.html", context)

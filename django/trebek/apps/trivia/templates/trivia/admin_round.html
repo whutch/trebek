@@ -150,7 +150,7 @@
         <hr/>
         <div class="row">
             {% for category, questions in categories %}
-                <div class="col">
+                <div class="col-2">
                     <div class="category">
                         <p>{{ category.title }}</p>
                     </div>
@@ -180,11 +180,13 @@
             POP_QUESTION: 30,
             CLEAR_QUESTION: 31,
             REQUIRE_WAGER: 32,
+            REQUIRE_ANSWER: 33,
             DISPLAY_TEXT: 34,
             PLAYER_BUZZED: 40,
             CLEAR_BUZZ: 41,
             CLEAR_ALL_BUZZES: 42,
             PLAYER_ENTERED_WAGER: 43,
+            PLAYER_ENTERED_ANSWER: 44,
             UPDATE_SCORE: 50,
             PLAY_SOUND: 60,
             TOGGLE_SCOREBOARD: 70,
@@ -225,14 +227,23 @@
         var buzzes = [];
         var wagering_player = null;
         var wagers = {};
+        var final_round = {% if final_round %}true{% else %}false{% endif %};
+        var final_popped = false;
 
-        function player_buzzed(id, name, no_sound=false) {
+        function player_buzzed(id, name, no_sound=false, no_message=true) {
             buzzes.push(id);
             $("#buzzed").append("<span>" + name + "</span>");
             $("#answer-controls .needs-buzz").attr("disabled", false);
             if (!no_sound) {
                 send_message(msg_types.PLAY_SOUND, {
                     sound: "buzz",
+                });
+            }
+            if (!no_message) {
+                send_message(msg_types.PLAYER_BUZZED, {
+                    player_id: id,
+                    player_name: name,
+                    no_sound: no_sound,
                 });
             }
         }
@@ -400,6 +411,10 @@
                     wagers[msg.player_id] = msg.amount;
                     $("#wagers").append("<span>" + msg.player_name + " (" + msg.amount + ")</span>");
                     break;
+                case msg_types.PLAYER_ENTERED_ANSWER:
+                    var buzz_text = msg.player_name + " [" + msg.answer + "]";
+                    player_buzzed(msg.player_id, buzz_text, true, false);
+                    break;
                 default:
                     console.error("Unhandled msg.type:", msg.type);
                     return;
@@ -452,18 +467,40 @@
             question_id = clicked_id;
             question = question_data[question_id];
             if (question.requires_wager) {
-                if (!wagering_player) {
-                    pop_question(null, true);
-                    require_wager();
-                    send_message(msg_types.DISPLAY_TEXT, {
-                        player_id: null,
-                        text: "Daily Double",
-                    });
+                if (final_round) {
+                    if (final_popped) {
+                        return;
+                    }
+                    if (Object.keys(wagers).length > 0) {
+                        pop_question();
+                        send_message(msg_types.REQUIRE_ANSWER, {
+                            player_id: null,
+                        });
+                        final_popped = true;
+                    }
+                    else {
+                        pop_question(null, true);
+                        require_wager(true);
+                        send_message(msg_types.DISPLAY_TEXT, {
+                            player_id: null,
+                            text: "{{ categories.0.0.title }}",
+                        });
+                    }
                 }
                 else {
-                    pop_question();
-                    var player = player_data[wagering_player]
-                    player_buzzed(wagering_player, player.name, true);
+                    if (wagering_player) {
+                        pop_question();
+                        var player = player_data[wagering_player]
+                        player_buzzed(wagering_player, player.name, true);
+                    }
+                    else {
+                        pop_question(null, true);
+                        require_wager();
+                        send_message(msg_types.DISPLAY_TEXT, {
+                            player_id: null,
+                            text: "Daily Double",
+                        });
+                    }
                 }
             }
             else {
@@ -472,25 +509,41 @@
         });
 
         $("#correct").on("click", function () {
-            if (question.requires_wager) {
-                var wager = wagers[wagering_player];
-                add_to_score(wagering_player, wager);
+            if (final_round) {
+                var player_id = buzzes[0];
+                var wager = wagers[player_id];
+                add_to_score(player_id, wager);
+                clear_buzzed();
             }
             else {
-                add_to_score(buzzes[0], question.points);
+                if (question.requires_wager) {
+                    var wager = wagers[wagering_player];
+                    add_to_score(wagering_player, wager);
+                }
+                else {
+                    add_to_score(buzzes[0], question.points);
+                }
+                clear_question(true);
             }
-            clear_question(true);
         });
 
         $("#wrong").on("click", function () {
-            if (question.requires_wager) {
-                var wager = wagers[wagering_player];
-                add_to_score(wagering_player, -wager);
-                clear_question(true);
+            if (final_round) {
+                var player_id = buzzes[0];
+                var wager = wagers[player_id];
+                add_to_score(player_id, -wager);
+                clear_buzzed();
             }
             else {
-                add_to_score(buzzes[0], -question.points);
-                clear_buzzed(false);
+                if (question.requires_wager) {
+                    var wager = wagers[wagering_player];
+                    add_to_score(wagering_player, -wager);
+                    clear_question(true);
+                }
+                else {
+                    add_to_score(buzzes[0], -question.points);
+                    clear_buzzed(false);
+                }
             }
         });
 

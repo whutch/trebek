@@ -107,6 +107,7 @@ def admin(request, game_key):
     if game.current_round == 0:
         return render(request, "trivia/admin_landing.html", context)
     game_round = game.rounds.get(round=game.current_round)
+    context["final_round"] = game_round.is_final
     categories = []
     for category_state in game_round.categorystate_set.all():
         questions = []
@@ -137,6 +138,7 @@ def display(request, game_key):
         context["host_url"] = request.META["HTTP_HOST"]
         return render(request, "trivia/display_landing.html", context)
     game_round = game.rounds.get(round=game.current_round)
+    context["final_round"] = game_round.is_final
     categories = []
     for category_state in game_round.categorystate_set.all():
         questions = []
@@ -166,8 +168,12 @@ def buzzer(request, game_key):
         "game": game,
         "player": player,
         "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0]),
-        "max_wager": max(player.score, game.current_round * 1000),
+        "max_wager": player.score,
     }
     if game.current_round == 0:
         return render(request, "trivia/buzzer_landing.html", context)
+    game_round = game.rounds.get(round=game.current_round)
+    context["final_round"] = game_round.is_final
+    if not game_round.is_final:
+        context["max_wager"] = max(player.score, game.current_round * 1000)
     return render(request, "trivia/buzzer_round.html", context)

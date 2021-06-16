@@ -44,11 +44,13 @@ class MessageTypes:
     POP_QUESTION = 30
     CLEAR_QUESTION = 31
     REQUIRE_WAGER = 32
+    REQUIRE_ANSWER = 33
     DISPLAY_TEXT = 34
     PLAYER_BUZZED = 40
     CLEAR_BUZZ = 41
     CLEAR_ALL_BUZZES = 42
     PLAYER_ENTERED_WAGER = 43
+    PLAYER_ENTERED_ANSWER = 44
     UPDATE_SCORE = 50
     PLAY_SOUND = 60
     TOGGLE_SCOREBOARD = 70
@@ -282,8 +284,13 @@ class Admin(Client):
             for player in self.game.players:
                 await player.send_message(MessageTypes.CLEAR_QUESTION, msg_data)
         elif msg_type == MessageTypes.REQUIRE_WAGER:
+            round = await sync_to_async(self.game.get_round)()
+            final_round = await sync_to_async(self.game.get_final_round)()
+            if round == final_round:
+                round_max_wager = 0
+            else:
+                round_max_wager = self.game.get_round() * 1000
             player_id = msg_data.pop("player_id")
-            round_max_wager = self.game.get_round() * 1000
             if player_id:
                 player = self.game.get_player_by_id(player_id)
                 log.info(f"Received a wager request for player '{player.name}' ({player.id}) of game {self.game.key}.")
@@ -297,6 +304,15 @@ class Admin(Client):
                     player_object = await sync_to_async(models.Player.objects.get)(id=player.id)
                     msg_data["max_wager"] = max(round_max_wager, player_object.score)
                     await player.send_message(MessageTypes.REQUIRE_WAGER, msg_data)
+        elif msg_type == MessageTypes.REQUIRE_ANSWER:
+            player_id = msg_data.pop("player_id")
+            if player_id:
+                player = self.game.get_player_by_id(player_id)
+                await player.send_message(MessageTypes.REQUIRE_ANSWER, msg_data)
+            else:
+                # Send to all players.
+                for player in self.game.players:
+                    await player.send_message(MessageTypes.REQUIRE_ANSWER, msg_data)
         elif msg_type == MessageTypes.DISPLAY_TEXT:
             player_id = msg_data.pop("player_id")
             if player_id:
@@ -309,6 +325,18 @@ class Admin(Client):
             # Pass it on to the displays.
             for display in self.game.displays:
                 await display.send_message(MessageTypes.DISPLAY_TEXT, msg_data)
+        elif msg_type == MessageTypes.PLAYER_BUZZED:
+            player = self.game.get_player_by_id(msg_data["player_id"])
+            if player in self.game.buzzes:
+                return
+            name = msg_data["player_name"]
+            log.info(f"Player '{name}' ({player.id}) buzzed in game {self.game.key}.")
+            self.game.buzzes.append(self)
+            # Pass it on to other admins.
+            for admin in self.game.admins:
+                if admin is self:
+                    continue
+                await admin.send_message(MessageTypes.PLAYER_BUZZED, msg_data)
         elif msg_type == MessageTypes.CLEAR_BUZZ:
             self.game.buzzes.popleft()
             # Pass it on to other admins.
@@ -414,6 +442,10 @@ class Player(Client):
             delta = time.time() - msg_data["start_time"]
             self.ping = delta
         elif msg_type == MessageTypes.PLAYER_BUZZED:
+            round = await sync_to_async(self.game.get_round)()
+            final_round = await sync_to_async(self.game.get_final_round)()
+            if round == final_round:
+                return
             question_id = msg_data["question_id"]
             if question_id != self.game.popped_question_uuid:
                 return
@@ -430,6 +462,12 @@ class Player(Client):
             # Pass it on to admins.
             for admin in self.game.admins:
                 await admin.send_message(MessageTypes.PLAYER_ENTERED_WAGER, msg_data)
+        elif msg_type == MessageTypes.PLAYER_ENTERED_ANSWER:
+            answer = msg_data["answer"]
+            log.info(f"Player '{self.name}' ({self.id}) submit an answer of '{answer}' in game {self.game.key}.")
+            # Pass it on to admins.
+            for admin in self.game.admins:
+                await admin.send_message(MessageTypes.PLAYER_ENTERED_ANSWER, msg_data)
         else:
             log.warning(f"Player sent unhandled message type '{msg_type}': {msg_data}")
 

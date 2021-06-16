@@ -120,18 +120,20 @@
 {% block page_content %}
     <div id="gameboard" class="container">
         <div class="row">
-            {% for category, questions in categories %}
-                <div class="col">
-                    <div class="category">
-                        <p>{{ category.title }}</p>
-                    </div>
-                    {% for question in questions %}
-                        <div class="question" id="question-{{ question.id }}">
-                            <p>{% if not question.answered %}{{ question.point_value }}{% endif %}</p>
+            {% if not final_round %}
+                {% for category, questions in categories %}
+                    <div class="col">
+                        <div class="category">
+                            <p>{{ category.title }}</p>
                         </div>
-                    {% endfor %}
-                </div>
-            {% endfor %}
+                        {% for question in questions %}
+                            <div class="question" id="question-{{ question.id }}">
+                                <p>{% if not question.answered %}{{ question.point_value }}{% endif %}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            {% endif %}
         </div>
     </div>
     <div id="scoreboard" class="container">
@@ -155,6 +157,11 @@
     <div id="status">
         <div class="alert" role="alert"></div>
     </div>
+    {% if final_round %}
+        <div class="popup popup-fs">
+            <p>Final Jeopardy</p>
+        </div>
+    {% endif %}
 {% endblock %}
 
 
@@ -172,11 +179,13 @@
             POP_QUESTION: 30,
             CLEAR_QUESTION: 31,
             REQUIRE_WAGER: 32,
+            REQUIRE_ANSWER: 33,
             DISPLAY_TEXT: 34,
             PLAYER_BUZZED: 40,
             CLEAR_BUZZ: 41,
             CLEAR_ALL_BUZZES: 42,
             PLAYER_ENTERED_WAGER: 43,
+            PLAYER_ENTERED_ANSWER: 44,
             UPDATE_SCORE: 50,
             PLAY_SOUND: 60,
             TOGGLE_SCOREBOARD: 70,

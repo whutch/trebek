@@ -81,7 +81,7 @@
             font-size: 250%;
         }
 
-        .question-popup {
+        .popup {
             position: absolute;
             z-index: 9;
             padding: 1em 0.6em;
@@ -97,12 +97,12 @@
             -webkit-transition: 1.5s;
         }
 
-        .question-popup > p {
+        .popup > p {
             width: 100%;
             padding: 1em;
         }
 
-        .question-popup-fs {
+        .popup-fs {
             width: 100vw !important;
             height: 100vh !important;
             top: 0 !important;
@@ -233,7 +233,7 @@
                 hide_popup();
                 return;
             }
-            var existing_popup = $(".question-popup");
+            var existing_popup = $(".popup");
             if (existing_popup[0]) {
                 existing_popup.html("<p>" + text + "</p>");
                 return;
@@ -243,7 +243,7 @@
                 // Not a question we know about, just use the first box as an anchor.
                 question_box = $(".question:first");
             }
-            var popup = $("<div class='question-popup'></div>").appendTo($("body"));
+            var popup = $("<div class='popup'></div>").appendTo($("body"));
             // TODO: DON'T PUT RAW HTML IN HERE, USE A MARKUP RENDERER TO ALLOW TAGS SAFELY
             var popup_text = $("<p>" + text + "</p>").appendTo(popup);
             //var popup_text = $("<p></p>").appendTo(popup);
@@ -252,14 +252,14 @@
             popup.height(question_box.outerHeight());
             popup.css(question_box.offset());
             setTimeout(function() {
-                popup.addClass("question-popup-fs");
+                popup.addClass("popup-fs");
             }, 200);
         }
 
         function hide_popup() {
-            var popup = $(".question-popup-fs");
+            var popup = $(".popup-fs");
             if (popup[0]) {
-                popup.removeClass("question-popup-fs");
+                popup.removeClass("popup-fs");
                 setTimeout(function() {
                     popup.remove();
                 }, 1400);

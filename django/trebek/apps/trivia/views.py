@@ -15,7 +15,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 import websockets
 
-from .models import Game, Player, QuestionState
+from .models import Game, Player
 
 
 if settings.ENABLE_SSL:
@@ -102,27 +102,27 @@ def admin(request, game_key):
     context = {
         "game": game,
         "players": Player.objects.filter(game=game),
-        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0])
+        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0]),
     }
     if game.current_round == 0:
         return render(request, "trivia/admin_landing.html", context)
+    game_round = game.rounds.get(round=game.current_round)
+    context["final_round"] = game_round.is_final
     categories = []
-    for category in game.categories.filter(round=game.current_round):
+    for category_state in game_round.categorystate_set.all():
         questions = []
-        for question in category.questions.all():
+        for question_state in game_round.questionstate_set.filter(question__category=category_state.category):
+            question = question_state.question
             question_data = {
                 "id": question.id,
                 "text": question.text,
                 "answer": question.answer,
-                "point_value": question.point_value,
+                "point_value": question_state.get_modified_point_value(),
+                "answered": question_state.answered,
+                "requires_wager": question_state.requires_wager,
             }
-            try:
-                state = question.questionstate_set.get(game=game)
-            except QuestionState.DoesNotExist:
-                state = None
-            question_data["answered"] = state.answered if state else False
             questions.append(question_data)
-        categories.append([category, questions])
+        categories.append([category_state.category, questions])
     context["categories"] = categories
     return render(request, "trivia/admin_round.html", context)
 
@@ -132,28 +132,25 @@ def display(request, game_key):
     context = {
         "game": game,
         "players": Player.objects.filter(game=game),
-        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0])
+        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0]),
     }
     if game.current_round == 0:
         context["host_url"] = request.META["HTTP_HOST"]
         return render(request, "trivia/display_landing.html", context)
+    game_round = game.rounds.get(round=game.current_round)
+    context["final_round"] = game_round.is_final
     categories = []
-    for category in game.categories.filter(round=game.current_round):
+    for category_state in game_round.categorystate_set.all():
         questions = []
-        for question in category.questions.all():
+        for question_state in game_round.questionstate_set.filter(question__category=category_state.category):
+            question = question_state.question
             question_data = {
                 "id": question.id,
-                "text": question.text,
-                "answer": question.answer,
-                "point_value": question.point_value,
+                "point_value": question_state.get_modified_point_value(),
+                "answered": question_state.answered,
             }
-            try:
-                state = question.questionstate_set.get(game=game)
-            except QuestionState.DoesNotExist:
-                state = None
-            question_data["answered"] = state.answered if state else False
             questions.append(question_data)
-        categories.append([category, questions])
+        categories.append([category_state.category, questions])
     context["categories"] = categories
     return render(request, "trivia/display_round.html", context)
 
@@ -170,8 +167,13 @@ def buzzer(request, game_key):
     context = {
         "game": game,
         "player": player,
-        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0])
+        "ws_uri": WS_URI.format(request.META["HTTP_HOST"].split(":")[0]),
+        "max_wager": player.score,
     }
     if game.current_round == 0:
         return render(request, "trivia/buzzer_landing.html", context)
+    game_round = game.rounds.get(round=game.current_round)
+    context["final_round"] = game_round.is_final
+    if not game_round.is_final:
+        context["max_wager"] = max(player.score, game.current_round * 1000)
     return render(request, "trivia/buzzer_round.html", context)

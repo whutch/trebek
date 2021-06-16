@@ -20,17 +20,39 @@
             width: 100%;
         }
 
+        button.question.requires-wager {
+            color: red;
+        }
+
         #question-context {
             display: none;
         }
 
-        #buzzed {
+        #buzzed, #wagers {
             color: blue;
             font-weight: bold;
         }
 
-        #buzzed span {
+        #buzzed span, #wagers span {
             margin-left: 1em;
+        }
+
+        #player-picker {
+            display: none;
+        }
+
+        #player-picker ul {
+            list-style-type: none;
+            margin: 1em;
+            padding: 0;
+        }
+
+        #player-picker ul li {
+            display: inline;
+        }
+
+        #player-picker ul li:not(:first-child) {
+            margin-left: 0.5em;
         }
 
         img.reconnecting {
@@ -107,17 +129,33 @@
                         Buzzed: <span id="buzzed"></span>
                     </div>
                 </div>
+                <div class="row">
+                    <div class="col">
+                        Wagers: <span id="wagers"></span>
+                    </div>
+                </div>
             </div>
+        </div>
+        <div class="row" id="player-picker">
+            <ul>
+                {% for player in players %}
+                    <li>
+                        <button type="button" class="btn btn-primary" id="player-{{ player.id }}">
+                            {{ player.name }}
+                        </button>
+                    </li>
+                {% endfor %}
+            </ul>
         </div>
         <hr/>
         <div class="row">
             {% for category, questions in categories %}
-                <div class="col">
+                <div class="col-2">
                     <div class="category">
                         <p>{{ category.title }}</p>
                     </div>
                     {% for question in questions %}
-                        <button type="button" class="btn btn-primary question" id="question-{{ question.id }}">
+                        <button type="button" class="btn btn-primary question {% if question.requires_wager %}requires-wager{% endif %}" id="question-{{ question.id }}">
                             {{ question.point_value }}
                         </button>
                     {% endfor %}
@@ -141,9 +179,14 @@
             CHANGE_ROUND: 22,
             POP_QUESTION: 30,
             CLEAR_QUESTION: 31,
+            REQUIRE_WAGER: 32,
+            REQUIRE_ANSWER: 33,
+            DISPLAY_TEXT: 34,
             PLAYER_BUZZED: 40,
             CLEAR_BUZZ: 41,
             CLEAR_ALL_BUZZES: 42,
+            PLAYER_ENTERED_WAGER: 43,
+            PLAYER_ENTERED_ANSWER: 44,
             UPDATE_SCORE: 50,
             PLAY_SOUND: 60,
             TOGGLE_SCOREBOARD: 70,
@@ -163,6 +206,7 @@
                         answer: `{{ question.answer|safe }}`,
                         points: {{ question.point_value }},
                         answered: {{ question.answered|yesno:"true,false" }},
+                        requires_wager: {{ question.requires_wager|yesno:"true,false" }},
                     },
                 {% endfor %}
             {% endfor %}
@@ -181,14 +225,25 @@
         var question_id = null;
         var question = null;
         var buzzes = [];
+        var wagering_player = null;
+        var wagers = {};
+        var final_round = {% if final_round %}true{% else %}false{% endif %};
+        var final_popped = false;
 
-        function player_buzzed(id, name, no_sound=false) {
+        function player_buzzed(id, name, no_sound=false, no_message=true) {
             buzzes.push(id);
             $("#buzzed").append("<span>" + name + "</span>");
             $("#answer-controls .needs-buzz").attr("disabled", false);
             if (!no_sound) {
                 send_message(msg_types.PLAY_SOUND, {
                     sound: "buzz",
+                });
+            }
+            if (!no_message) {
+                send_message(msg_types.PLAYER_BUZZED, {
+                    player_id: id,
+                    player_name: name,
+                    no_sound: no_sound,
                 });
             }
         }
@@ -228,6 +283,8 @@
                 send_message(msg_types.POP_QUESTION, {
                     question_id: parseInt(question_id) || question_id,
                     question_text: question.text,
+                    question_requires_wager: question.requires_wager,
+                    specific_player: wagering_player,
                 });
             }
         }
@@ -237,6 +294,7 @@
                 answered = false;
             }
             clear_buzzed(true, no_message);
+            $("#wagers span").remove();
             $("#question-context").hide();
             if (!no_message) {
                 send_message(msg_types.CLEAR_QUESTION, {
@@ -250,6 +308,8 @@
             }
             question = null;
             question_id = null;
+            wagering_player = null;
+            wagers = {};
         }
 
         function disable_question(id) {
@@ -266,6 +326,23 @@
                 .attr("disabled", false);
         }
 
+        function require_wager(all_players=false)
+        {
+            if (all_players) {
+                send_message(msg_types.REQUIRE_WAGER, {
+                    player_id: null,
+                });
+            }
+            else {
+                show_player_picker(function(player_id) {
+                    wagering_player = player_id
+                    send_message(msg_types.REQUIRE_WAGER, {
+                        player_id: wagering_player,
+                    });
+                });
+            }
+        }
+
         function add_to_score(player_id, amount)
         {
             player_data[player_id].score += amount
@@ -273,6 +350,16 @@
                 player_id: player_id,
                 score: player_data[player_id].score,
             });
+        }
+
+        function show_player_picker(callback) {
+            $("#player-picker button").on("click.player-picker", function () {
+                player_id = $(this).attr("id").split("-")[1];
+                callback(player_id);
+                $("#player-picker").hide();
+                $("#player-picker button").off("click.player-picker");
+            });
+            $("#player-picker").show();
         }
 
         function show_alert(html, alert_class="danger") {
@@ -320,6 +407,14 @@
                 case msg_types.CLEAR_ALL_BUZZES:
                     clear_buzzed(true, true);
                     break;
+                case msg_types.PLAYER_ENTERED_WAGER:
+                    wagers[msg.player_id] = msg.amount;
+                    $("#wagers").append("<span>" + msg.player_name + " (" + msg.amount + ")</span>");
+                    break;
+                case msg_types.PLAYER_ENTERED_ANSWER:
+                    var buzz_text = msg.player_name + " [" + msg.answer + "]";
+                    player_buzzed(msg.player_id, buzz_text, true, false);
+                    break;
                 default:
                     console.error("Unhandled msg.type:", msg.type);
                     return;
@@ -362,17 +457,94 @@
         }
 
         $(".question").on("click", function () {
-            pop_question($(this).attr("id").split("-")[1]);
+            var clicked_id = $(this).attr("id").split("-")[1];
+            if (question || question_id) {
+                // There's already a popped question.
+                if (question.requires_wager && clicked_id != question_id) {
+                    return;
+                }
+            }
+            question_id = clicked_id;
+            question = question_data[question_id];
+            if (question.requires_wager) {
+                if (final_round) {
+                    if (final_popped) {
+                        return;
+                    }
+                    if (Object.keys(wagers).length > 0) {
+                        pop_question();
+                        send_message(msg_types.REQUIRE_ANSWER, {
+                            player_id: null,
+                        });
+                        final_popped = true;
+                    }
+                    else {
+                        pop_question(null, true);
+                        require_wager(true);
+                        send_message(msg_types.DISPLAY_TEXT, {
+                            player_id: null,
+                            text: "{{ categories.0.0.title }}",
+                        });
+                    }
+                }
+                else {
+                    if (wagering_player) {
+                        pop_question();
+                        var player = player_data[wagering_player]
+                        player_buzzed(wagering_player, player.name, true);
+                    }
+                    else {
+                        pop_question(null, true);
+                        require_wager();
+                        send_message(msg_types.DISPLAY_TEXT, {
+                            player_id: null,
+                            text: "Daily Double",
+                        });
+                    }
+                }
+            }
+            else {
+                pop_question();
+            }
         });
 
         $("#correct").on("click", function () {
-            add_to_score(buzzes[0], question.points);
-            clear_question(true);
+            if (final_round) {
+                var player_id = buzzes[0];
+                var wager = wagers[player_id];
+                add_to_score(player_id, wager);
+                clear_buzzed();
+            }
+            else {
+                if (question.requires_wager) {
+                    var wager = wagers[wagering_player];
+                    add_to_score(wagering_player, wager);
+                }
+                else {
+                    add_to_score(buzzes[0], question.points);
+                }
+                clear_question(true);
+            }
         });
 
         $("#wrong").on("click", function () {
-            add_to_score(buzzes[0], -question.points);
-            clear_buzzed(false);
+            if (final_round) {
+                var player_id = buzzes[0];
+                var wager = wagers[player_id];
+                add_to_score(player_id, -wager);
+                clear_buzzed();
+            }
+            else {
+                if (question.requires_wager) {
+                    var wager = wagers[wagering_player];
+                    add_to_score(wagering_player, -wager);
+                    clear_question(true);
+                }
+                else {
+                    add_to_score(buzzes[0], -question.points);
+                    clear_buzzed(false);
+                }
+            }
         });
 
         $("#clear-buzz").on("click", function () {

@@ -12,6 +12,11 @@
             color: white;
         }
 
+        #player-details {
+            margin-top: 5vh;
+            font-size: 200%;
+        }
+
         #buttons {
             margin-top: 5vh;
         }
@@ -47,9 +52,17 @@
 
 {% block page_content %}
     <div class="container">
+        <div class="row" id="player-details">
+            <div class="col">
+                <span id="player-name">{{ player.name }}</span>
+            </div>
+            <div class="col">
+                Score: <span id="player-score">{{ player.score }}</span>
+            </div>
+        </div>
         <div class="row" id="buttons">
             <div class="col">
-                <button type="button" id="buzzer" class="btn btn-danger btn-lg" id="buzzer" disabled="true">
+                <button type="button" class="btn btn-danger btn-lg" id="buzzer" disabled="true">
                     Connecting.. <img class="reconnecting" src="{% static 'trebek/reconnecting.svg' %}"/>
                 </button>
             </div>
@@ -76,9 +89,14 @@
             CHANGE_ROUND: 22,
             POP_QUESTION: 30,
             CLEAR_QUESTION: 31,
+            REQUIRE_WAGER: 32,
+            REQUIRE_ANSWER: 33,
+            DISPLAY_TEXT: 34,
             PLAYER_BUZZED: 40,
             CLEAR_BUZZ: 41,
             CLEAR_ALL_BUZZES: 42,
+            PLAYER_ENTERED_WAGER: 43,
+            PLAYER_ENTERED_ANSWER: 44,
             UPDATE_SCORE: 50,
             PLAY_SOUND: 60,
             TOGGLE_SCOREBOARD: 70,

@@ -1,2 +1,2 @@
-django>=2.2.13,<3.0.0
+Django==3.2.4
 websockets==7.0

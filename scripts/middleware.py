@@ -16,6 +16,7 @@ import sys
 import time
 import uuid
 
+from asgiref.sync import sync_to_async
 import django
 import websockets
 
@@ -42,9 +43,14 @@ class MessageTypes:
     CHANGE_ROUND = 22
     POP_QUESTION = 30
     CLEAR_QUESTION = 31
+    REQUIRE_WAGER = 32
+    REQUIRE_ANSWER = 33
+    DISPLAY_TEXT = 34
     PLAYER_BUZZED = 40
     CLEAR_BUZZ = 41
     CLEAR_ALL_BUZZES = 42
+    PLAYER_ENTERED_WAGER = 43
+    PLAYER_ENTERED_ANSWER = 44
     UPDATE_SCORE = 50
     PLAY_SOUND = 60
     TOGGLE_SCOREBOARD = 70
@@ -56,23 +62,19 @@ log = logging.getLogger("middleware")
 GAMES = {}
 
 
-def mark_question_answered(game_key, question_id):
+async def mark_question_answered(game_key, question_id):
     try:
-        question = models.Question.objects.get(id=question_id)
-    except models.Question.DoesNotExist:
-        log.warning(f"Tried to clear non-existent question: {question_id}")
-        return
-    try:
-        game = models.Game.objects.get(key=game_key)
+        game = await sync_to_async(models.Game.objects.get)(key=game_key)
     except models.Game.DoesNotExist:
         log.warning(f"Game key does not exist in database: {game_key}")
         return
     try:
-        state = question.questionstate_set.get(game=game)
-    except models.QuestionState.DoesNotExist:
-        state = models.QuestionState(question=question, game=game)
-        state.answered = True
-        state.save()
+        question_state = await sync_to_async(models.QuestionState.objects.get)(game_round__game=game, question__id=question_id)
+    except models.Question.DoesNotExist:
+        log.warning(f"Question does not have state in game: {question_id}, {game_key}")
+        return
+    question_state.answered = True
+    await sync_to_async(question_state.save)()
 
 
 def parse_message(msg):
@@ -98,17 +100,29 @@ class Game:
         self.popped_question_real_id = None
         self.popped_question_text = None
         self.buzzes = deque()
-        self._game = models.Game.objects.get(key=game_key)
+        self._game = None
         GAMES[game_key] = self
 
-    @property
-    def round(self):
+    def get_round(self):
+        if not self._game:
+            self._game = models.Game.objects.get(key=self.key)
         return self._game.current_round
 
-    @round.setter
-    def round(self, value):
+    def set_round(self, value):
+        if not self._game:
+            self._game = models.Game.objects.get(key=self.key)
         self._game.current_round = value
         self._game.save()
+
+    def get_final_round(self):
+        if not self._game:
+            self._game = models.Game.objects.get(key=self.key)
+        return self._game.rounds.last().round
+
+    def reset(self):
+        if not self._game:
+            self._game = models.Game.objects.get(key=self.key)
+        self._game.reset()
 
     def register_client(self, client):
         if isinstance(client, Admin):
@@ -124,6 +138,12 @@ class Game:
             log.error(f"Client subclass not recognized: {client}")
         else:
             log.error(f"Tried to register {client} as a client!")
+
+    def get_player_by_id(self, player_id):
+        for player in self.players:
+            if player.id == player_id:
+                return player
+        return None
 
 
 class Client:
@@ -167,6 +187,9 @@ class Client:
         msg.update(msg_data)
         await self._ws.send(json.dumps(msg))
 
+    def clean_up(self):
+        raise NotImplementedError
+
 
 class Admin(Client):
 
@@ -200,25 +223,24 @@ class Admin(Client):
             self.game.popped_question_uuid = None
             self.game.popped_question_text = None
             self.game.buzzes.clear()
-            self.game.round = 0
-            # Delete all question states for this game.
-            models.QuestionState.objects.filter(game__key=self.game.key).delete()
-            # Reset all scores.
-            for player in models.Player.objects.filter(game__key=self.game.key):
-                player.score = 0
-                player.save()
+            await sync_to_async(self.game.reset)()
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.GAME_RESET)
         elif msg_type == MessageTypes.CHANGE_ROUND:
-            if self.game.round == msg_data["round"] or msg_data["round"] < 1:
+            new_round = msg_data["round"]
+            if new_round < 1:
                 return
-            log.info(f"Changing to round {msg_data['round']} in game {self.game.key}.")
+            round = await sync_to_async(self.game.get_round)()
+            final_round = await sync_to_async(self.game.get_final_round)()
+            if round == new_round or new_round > final_round:
+                return
+            log.info(f"Changing to round {new_round} in game {self.game.key}.")
             self.game.popped_question_real_id = None
             self.game.popped_question_uuid = None
             self.game.popped_question_text = None
             self.game.buzzes.clear()
-            self.game.round = msg_data["round"]
+            await sync_to_async(self.game.set_round)(new_round)
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.CHANGE_ROUND, msg_data)
@@ -238,8 +260,13 @@ class Admin(Client):
             question_uuid = str(uuid.uuid4())
             self.game.popped_question_uuid = question_uuid
             msg_data["question_id"] = question_uuid
-            for player in self.game.players:
+            specific_player = msg_data.pop("specific_player")
+            if specific_player:
+                player = self.game.get_player_by_id(specific_player)
                 await player.send_message(MessageTypes.POP_QUESTION, msg_data)
+            else:
+                for player in self.game.players:
+                    await player.send_message(MessageTypes.POP_QUESTION, msg_data)
         elif msg_type == MessageTypes.CLEAR_QUESTION:
             self.game.popped_question_real_id = None
             self.game.popped_question_uuid = None
@@ -248,7 +275,7 @@ class Admin(Client):
             # Mark the question as answered.
             if msg_data.get("answered"):
                 question_id = msg_data["question_id"]
-                mark_question_answered(self.game.key, question_id)
+                await mark_question_answered(self.game.key, question_id)
             # Pass it on to the displays.
             for display in self.game.displays:
                 await display.send_message(MessageTypes.CLEAR_QUESTION, msg_data)
@@ -256,6 +283,60 @@ class Admin(Client):
             del msg_data["question_id"]
             for player in self.game.players:
                 await player.send_message(MessageTypes.CLEAR_QUESTION, msg_data)
+        elif msg_type == MessageTypes.REQUIRE_WAGER:
+            round = await sync_to_async(self.game.get_round)()
+            final_round = await sync_to_async(self.game.get_final_round)()
+            if round == final_round:
+                round_max_wager = 0
+            else:
+                round_max_wager = self.game.get_round() * 1000
+            player_id = msg_data.pop("player_id")
+            if player_id:
+                player = self.game.get_player_by_id(player_id)
+                log.info(f"Received a wager request for player '{player.name}' ({player.id}) of game {self.game.key}.")
+                player_object = await sync_to_async(models.Player.objects.get)(id=player_id)
+                msg_data["max_wager"] = max(round_max_wager, player_object.score)
+                await player.send_message(MessageTypes.REQUIRE_WAGER, msg_data)
+            else:
+                # Send to all players.
+                log.info(f"Received a wager request for all players in game {self.game.key}.")
+                for player in self.game.players:
+                    player_object = await sync_to_async(models.Player.objects.get)(id=player.id)
+                    msg_data["max_wager"] = max(round_max_wager, player_object.score)
+                    await player.send_message(MessageTypes.REQUIRE_WAGER, msg_data)
+        elif msg_type == MessageTypes.REQUIRE_ANSWER:
+            player_id = msg_data.pop("player_id")
+            if player_id:
+                player = self.game.get_player_by_id(player_id)
+                await player.send_message(MessageTypes.REQUIRE_ANSWER, msg_data)
+            else:
+                # Send to all players.
+                for player in self.game.players:
+                    await player.send_message(MessageTypes.REQUIRE_ANSWER, msg_data)
+        elif msg_type == MessageTypes.DISPLAY_TEXT:
+            player_id = msg_data.pop("player_id")
+            if player_id:
+                player = self.game.get_player_by_id(player_id)
+                await player.send_message(MessageTypes.DISPLAY_TEXT, msg_data)
+            else:
+                # Pass it on to all players.
+                for player in self.game.players:
+                    await player.send_message(MessageTypes.DISPLAY_TEXT, msg_data)
+            # Pass it on to the displays.
+            for display in self.game.displays:
+                await display.send_message(MessageTypes.DISPLAY_TEXT, msg_data)
+        elif msg_type == MessageTypes.PLAYER_BUZZED:
+            player = self.game.get_player_by_id(msg_data["player_id"])
+            if player in self.game.buzzes:
+                return
+            name = msg_data["player_name"]
+            log.info(f"Player '{name}' ({player.id}) buzzed in game {self.game.key}.")
+            self.game.buzzes.append(self)
+            # Pass it on to other admins.
+            for admin in self.game.admins:
+                if admin is self:
+                    continue
+                await admin.send_message(MessageTypes.PLAYER_BUZZED, msg_data)
         elif msg_type == MessageTypes.CLEAR_BUZZ:
             self.game.buzzes.popleft()
             # Pass it on to other admins.
@@ -273,13 +354,18 @@ class Admin(Client):
         elif msg_type == MessageTypes.UPDATE_SCORE:
             player_id = msg_data["player_id"]
             score = msg_data["score"]
-            player = models.Player.objects.get(id=player_id)
-            log.info(f"Received score update for player '{player.name}' ({player.id}) of game {self.game.key}, new value is {score}.")
-            player.score = score
-            player.save()
+            player_object = await sync_to_async(models.Player.objects.get)(id=player_id)
+            log.info(f"Received score update for player '{player_object.name}' ({player_object.id})"
+                     f" of game {self.game.key}, new value is {score}.")
+            player_object.score = score
+            await sync_to_async(player_object.save)()
             # Pass it on to the displays.
             for display in self.game.displays:
                 await display.send_message(MessageTypes.UPDATE_SCORE, msg_data)
+            # Pass it on to the player.
+            player = self.game.get_player_by_id(player_id)
+            del msg_data["player_id"]
+            await player.send_message(MessageTypes.UPDATE_SCORE, msg_data)
         elif msg_type == MessageTypes.PLAY_SOUND:
             # Pass it on to the displays and players.
             for client in itertools.chain(self.game.displays, self.game.players):
@@ -290,6 +376,9 @@ class Admin(Client):
                 await display.send_message(MessageTypes.TOGGLE_SCOREBOARD)
         else:
             log.warning(f"Admin sent unhandled message type '{msg_type}': {msg_data}")
+
+    def clean_up(self):
+        self.game.admins.remove(self)
 
 
 class Display(Client):
@@ -312,6 +401,9 @@ class Display(Client):
             # We don't currently handle any messages from displays.
             log.warning(f"Display sent unhandled message type '{msg_type}': {msg_data}")
 
+    def clean_up(self):
+        self.game.displays.remove(self)
+
 
 class Player(Client):
 
@@ -328,12 +420,12 @@ class Player(Client):
         if player.game.admins:
             await player.send_message(MessageTypes.ADMIN_CONNECTED)
         # Pass the player data on to the admins and displays.
-        score = models.Player.objects.get(id=player.id).score
+        player_object = await sync_to_async(models.Player.objects.get)(id=player.id)
         for client in itertools.chain(player.game.admins, player.game.displays):
             await client.send_message(MessageTypes.PLAYER_CONNECTED, {
                 "player_id": player.id,
                 "player_name": player.name,
-                "score": score,
+                "score": player_object.score,
             })
         # If there is a question popped, let the player know.
         if player.game.popped_question_real_id:
@@ -350,6 +442,10 @@ class Player(Client):
             delta = time.time() - msg_data["start_time"]
             self.ping = delta
         elif msg_type == MessageTypes.PLAYER_BUZZED:
+            round = await sync_to_async(self.game.get_round)()
+            final_round = await sync_to_async(self.game.get_final_round)()
+            if round == final_round:
+                return
             question_id = msg_data["question_id"]
             if question_id != self.game.popped_question_uuid:
                 return
@@ -360,8 +456,23 @@ class Player(Client):
             # Pass it on to everything.
             for client in itertools.chain(self.game.admins, self.game.displays, self.game.players):
                 await client.send_message(MessageTypes.PLAYER_BUZZED, msg_data)
+        elif msg_type == MessageTypes.PLAYER_ENTERED_WAGER:
+            amount = msg_data["amount"]
+            log.info(f"Player '{self.name}' ({self.id}) submit a wager of {amount} in game {self.game.key}.")
+            # Pass it on to admins.
+            for admin in self.game.admins:
+                await admin.send_message(MessageTypes.PLAYER_ENTERED_WAGER, msg_data)
+        elif msg_type == MessageTypes.PLAYER_ENTERED_ANSWER:
+            answer = msg_data["answer"]
+            log.info(f"Player '{self.name}' ({self.id}) submit an answer of '{answer}' in game {self.game.key}.")
+            # Pass it on to admins.
+            for admin in self.game.admins:
+                await admin.send_message(MessageTypes.PLAYER_ENTERED_ANSWER, msg_data)
         else:
             log.warning(f"Player sent unhandled message type '{msg_type}': {msg_data}")
+
+    def clean_up(self):
+        self.game.players.remove(self)
 
 
 async def create_client(websocket):
@@ -395,6 +506,7 @@ async def handle_websocket(websocket, path):
         log.info(f"Lost connection from {host}.")
     else:
         await websocket.close()
+        client.clean_up()
 
 
 def start_middleware():

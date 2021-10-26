@@ -335,7 +335,7 @@
             }
             else {
                 show_player_picker(function(player_id) {
-                    wagering_player = player_id
+                    wagering_player = player_id;
                     send_message(msg_types.REQUIRE_WAGER, {
                         player_id: wagering_player,
                     });
@@ -355,6 +355,7 @@
         function show_player_picker(callback) {
             $("#player-picker button").on("click.player-picker", function () {
                 player_id = $(this).attr("id").split("-")[1];
+                player_id = parseInt(player_id);
                 callback(player_id);
                 $("#player-picker").hide();
                 $("#player-picker button").off("click.player-picker");

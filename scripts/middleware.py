@@ -428,6 +428,10 @@ class Player(Client):
                 "player_name": player.name,
                 "score": player_object.score,
             })
+        # Send the player their current score.
+        await player.send_message(MessageTypes.UPDATE_SCORE, {
+                "score": player_object.score,
+            })
         # If there is a question popped, let the player know.
         if player.game.popped_question_real_id:
             await player.send_message(MessageTypes.POP_QUESTION, {

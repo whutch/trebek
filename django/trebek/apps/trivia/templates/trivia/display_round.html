@@ -356,10 +356,10 @@
             $("#status").hide();
         }
 
-        function parse_message(msg) {
-            switch (msg.type) {
+        function parse_message(type, data) {
+            switch (type) {
                 case msg_types.ERROR:
-                    console.error("Received error from middleware:", msg.error);
+                    console.error("Received error from middleware:", data.error);
                     return;
                 case msg_types.GAME_RESET:
                 case msg_types.CHANGE_ROUND:
@@ -368,41 +368,44 @@
                 case msg_types.PLAYER_CONNECTED:
                     break;
                 case msg_types.POP_QUESTION:
-                    pop_question(msg.question_id, msg.question_text);
+                    pop_question(data.question_id, data.question_text);
                     break;
                 case msg_types.CLEAR_QUESTION:
-                    clear_question(msg.answered);
+                    clear_question(data.answered);
                     break;
                 case msg_types.DISPLAY_TEXT:
-                    show_popup(msg.text);
+                    show_popup(data.text);
                     break;
                 case msg_types.PLAYER_BUZZED:
                     break;
                 case msg_types.UPDATE_SCORE:
-                    set_score(msg.player_id, msg.score);
+                    set_score(data.player_id, data.score);
                     break;
                 case msg_types.PLAY_SOUND:
-                    play_sound(msg.sound);
+                    play_sound(data.sound);
                     break;
                 case msg_types.TOGGLE_SCOREBOARD:
                     toggle_scoreboard();
                     break;
                 default:
-                    console.error("Unhandled msg.type:", msg.type);
+                    console.error("Unhandled message type:", type);
                     return;
             }
         }
 
         function send_message(type, data={}) {
             Object.assign(data, {
-                type: type,
                 game_key: "{{ game.key }}",
             });
+            var msg = {
+                type: type,
+                data: data,
+            };
             if (!ws || ws.readyState != WebSocket.OPEN) {
-                console.error("Could not send msg, websocket closed:", data);
+                console.error("Could not send msg, websocket closed:", msg);
                 return;
             }
-            ws.send(JSON.stringify(data));
+            ws.send(JSON.stringify(msg));
         }
 
         function connect(uri) {
@@ -412,8 +415,8 @@
                 clear_alert();
             };
             ws.onmessage = function (event) {
-                var data = JSON.parse(event.data);
-                parse_message(data);
+                var msg = JSON.parse(event.data);
+                parse_message(msg.type, msg.data);
             };
             ws.onclose = function () {
                 show_alert("Reconnecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>");

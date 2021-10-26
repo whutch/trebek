@@ -269,13 +269,13 @@
             $("#buttons").show();
         }
 
-        function parse_message(msg) {
-            switch (msg.type) {
+        function parse_message(type, data) {
+            switch (type) {
                 case msg_types.ERROR:
-                    console.error("Received error from middleware:", msg.error);
+                    console.error("Received error from middleware:", data.error);
                     return;
                 case msg_types.PING:
-                    send_message(msg_types.PING, msg);
+                    send_message(msg_types.PING, data);
                     return;
                 case msg_types.ADMIN_CONNECTED:
                     admin_connected = true;
@@ -286,8 +286,8 @@
                     location.reload();
                     break;
                 case msg_types.POP_QUESTION:
-                    question_id = msg.question_id;
-                    show_question(msg.question_text);
+                    question_id = data.question_id;
+                    show_question(data.question_text);
                     check_ready_state();
                     break;
                 case msg_types.CLEAR_QUESTION:
@@ -298,7 +298,7 @@
                     check_ready_state();
                     break;
                 case msg_types.REQUIRE_WAGER:
-                    max_wager = msg.max_wager;
+                    max_wager = data.max_wager;
                     $("#max-wager").text(max_wager);
                     show_wager_entry();
                     break;
@@ -312,30 +312,33 @@
                 case msg_types.CLEAR_BUZZ:
                     break;
                 case msg_types.UPDATE_SCORE:
-                    $("#player-score").text(msg.score);
+                    $("#player-score").text(data.score);
                     break;
                 case msg_types.PLAY_SOUND:
                     break;
                 default:
-                    console.error("Unhandled msg.type:", msg.type);
+                    console.error("Unhandled message type:", type);
                     return;
             }
         }
 
         function send_message(type, data = {}) {
             Object.assign(data, {
-                type: type,
                 // These sorts of values shouldn't be trusted from the client, but this
                 //  is just a dumb trivia app and I'm lazy.
                 game_key: "{{ game.key }}",
                 player_id: "{{ player.id }}",
                 player_name: "{{ player.name }}",
             });
+            var msg = {
+                type: type,
+                data: data,
+            };
             if (!ws || ws.readyState != WebSocket.OPEN) {
-                console.error("Could not send msg, websocket closed:", data);
+                console.error("Could not send msg, websocket closed:", msg);
                 return;
             }
-            ws.send(JSON.stringify(data));
+            ws.send(JSON.stringify(msg));
         }
 
         function connect(uri) {
@@ -345,8 +348,8 @@
                 check_ready_state();
             };
             ws.onmessage = function (event) {
-                var data = JSON.parse(event.data);
-                parse_message(data);
+                var msg = JSON.parse(event.data);
+                parse_message(msg.type, msg.data);
             };
             ws.onclose = function () {
                 check_ready_state();

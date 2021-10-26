@@ -376,18 +376,18 @@
             $("#status").hide();
         }
 
-        function parse_message(msg) {
-            switch (msg.type) {
+        function parse_message(type, data) {
+            switch (type) {
                 case msg_types.ERROR:
-                    console.error("Received error from middleware:", msg.error);
+                    console.error("Received error from middleware:", data.error);
                     return;
                 case msg_types.ADMIN_CONNECTED:
                     break;
                 case msg_types.PLAYER_CONNECTED:
-                    if (!(msg.player_id in player_data)) {
-                        player_data[msg.player_id] = {
-                            name: msg.player_name,
-                            score: msg.score,
+                    if (!(data.player_id in player_data)) {
+                        player_data[data.player_id] = {
+                            name: data.player_name,
+                            score: data.score,
                         };
                     }
                     break;
@@ -396,10 +396,10 @@
                     location.reload();
                     break;
                 case msg_types.POP_QUESTION:
-                    pop_question(msg.question_id, true);
+                    pop_question(data.question_id, true);
                     break;
                 case msg_types.PLAYER_BUZZED:
-                    player_buzzed(msg.player_id, msg.player_name, msg.no_sound);
+                    player_buzzed(data.player_id, data.player_name, data.no_sound);
                     break;
                 case msg_types.CLEAR_BUZZ:
                     clear_buzzed(false, true);
@@ -408,29 +408,32 @@
                     clear_buzzed(true, true);
                     break;
                 case msg_types.PLAYER_ENTERED_WAGER:
-                    wagers[msg.player_id] = msg.amount;
-                    $("#wagers").append("<span>" + msg.player_name + " (" + msg.amount + ")</span>");
+                    wagers[data.player_id] = data.amount;
+                    $("#wagers").append("<span>" + data.player_name + " (" + data.amount + ")</span>");
                     break;
                 case msg_types.PLAYER_ENTERED_ANSWER:
-                    var buzz_text = msg.player_name + " [" + msg.answer + "]";
-                    player_buzzed(msg.player_id, buzz_text, true, false);
+                    var buzz_text = data.player_name + " [" + data.answer + "]";
+                    player_buzzed(data.player_id, buzz_text, true, false);
                     break;
                 default:
-                    console.error("Unhandled msg.type:", msg.type);
+                    console.error("Unhandled message type:", type);
                     return;
             }
         }
 
         function send_message(type, data={}) {
             Object.assign(data, {
-                type: type,
                 game_key: "{{ game.key }}",
             });
+            var msg = {
+                type: type,
+                data: data,
+            };
             if (!ws || ws.readyState != WebSocket.OPEN) {
-                console.error("Could not send msg, websocket closed:", data);
+                console.error("Could not send msg, websocket closed:", msg);
                 return;
             }
-            ws.send(JSON.stringify(data));
+            ws.send(JSON.stringify(msg));
         }
 
         function connect(uri) {
@@ -440,8 +443,8 @@
                 clear_alert();
             };
             ws.onmessage = function (event) {
-                var data = JSON.parse(event.data);
-                parse_message(data);
+                var msg = JSON.parse(event.data);
+                parse_message(msg.type, msg.data);
             };
             ws.onclose = function () {
                 show_alert("Reconnecting.. <img class='reconnecting' src='{% static 'trebek/reconnecting.svg' %}'/>");

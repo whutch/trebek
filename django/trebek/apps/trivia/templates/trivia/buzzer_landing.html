@@ -166,10 +166,10 @@
             }
         }
 
-        function parse_message(msg) {
-            switch (msg.type) {
+        function parse_message(type, data) {
+            switch (type) {
                 case msg_types.ERROR:
-                    console.error("Received error from middleware:", msg.error);
+                    console.error("Received error from middleware:", data.error);
                     return;
                 case msg_types.ADMIN_CONNECTED:
                     admin_connected = true;
@@ -187,25 +187,28 @@
                 case msg_types.PLAY_SOUND:
                     break;
                 default:
-                    console.error("Unhandled msg.type:", msg.type);
+                    console.error("Unhandled message type:", type);
                     return;
             }
         }
 
         function send_message(type, data = {}) {
             Object.assign(data, {
-                type: type,
                 // These sorts of values shouldn't be trusted from the client, but this
                 //  is just a dumb trivia app and I'm lazy.
                 game_key: "{{ game.key }}",
                 player_id: "{{ player.id }}",
                 player_name: "{{ player.name }}",
             });
+            var msg = {
+                type: type,
+                data: data,
+            };
             if (!ws || ws.readyState != WebSocket.OPEN) {
-                console.error("Could not send msg, websocket closed:", data);
+                console.error("Could not send msg, websocket closed:", msg);
                 return;
             }
-            ws.send(JSON.stringify(data));
+            ws.send(JSON.stringify(msg));
         }
 
         function connect(uri) {
@@ -215,8 +218,8 @@
                 check_ready_state();
             };
             ws.onmessage = function (event) {
-                var data = JSON.parse(event.data);
-                parse_message(data);
+                var msg = JSON.parse(event.data);
+                parse_message(msg.type, msg.data);
             };
             ws.onclose = function () {
                 check_ready_state();

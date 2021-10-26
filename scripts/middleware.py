@@ -77,15 +77,15 @@ async def mark_question_answered(game_key, question_id):
     await sync_to_async(question_state.save)()
 
 
-def parse_message(msg):
+def parse_message(msg_json):
     try:
-        msg_data = json.loads(msg)
+        msg = json.loads(msg_json)
     except:
         raise
-    if not "type" in msg_data:
-        log.error(f"Message has no type: {msg_data}")
-        return None, msg_data
-    msg_type = msg_data.pop("type")
+    msg_type = msg.get("type")
+    msg_data = msg.get("data", {})
+    if msg_type is None:
+        log.error(f"Message has no type: {msg_json}")
     return msg_type, msg_data
 
 
@@ -184,8 +184,9 @@ class Client:
             return
         msg = {}
         msg["type"] = msg_type
-        msg.update(msg_data)
-        await self._ws.send(json.dumps(msg))
+        msg["data"] = msg_data
+        msg_json = json.dumps(msg)
+        await self._ws.send(msg_json)
 
     def clean_up(self):
         raise NotImplementedError
@@ -481,7 +482,7 @@ async def create_client(websocket):
         if not msg_type:
             continue
         if not "game_key" in msg_data:
-            log.error(f"Message has no game key: {msg_data}")
+            log.error(f"Message has no game key: {msg}")
             continue
         game_key = msg_data.pop("game_key")
         if msg_type == MessageTypes.ADMIN_CONNECTED:

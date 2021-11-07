@@ -294,6 +294,9 @@ class Admin(Client):
             player_id = msg_data.pop("player_id")
             if player_id:
                 player = self.game.get_player_by_id(player_id)
+                if not player:
+                   log.error(f"Received a wager request for player ({player_id}) not found in game!")
+                   return
                 log.info(f"Received a wager request for player '{player.name}' ({player.id}) of game {self.game.key}.")
                 player_object = await sync_to_async(models.Player.objects.get)(id=player_id)
                 msg_data["max_wager"] = max(round_max_wager, player_object.score)

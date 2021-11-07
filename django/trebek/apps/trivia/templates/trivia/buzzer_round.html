@@ -327,7 +327,7 @@
                 // These sorts of values shouldn't be trusted from the client, but this
                 //  is just a dumb trivia app and I'm lazy.
                 game_key: "{{ game.key }}",
-                player_id: "{{ player.id }}",
+                player_id: {{ player.id }},
                 player_name: "{{ player.name }}",
             });
             var msg = {

@@ -1,2 +1,2 @@
 Django==3.2.15
-websockets==7.0
+websockets==9.1
